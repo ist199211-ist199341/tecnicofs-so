@@ -90,7 +90,7 @@ void state_destroy() { /* nothing to do */
  */
 int inode_create(inode_type n_type) {
     for (int inumber = 0; inumber < INODE_TABLE_SIZE; inumber++) {
-        if ((inumber * (int) sizeof(allocation_state_t)) == 0) {
+        if ((inumber * (int)sizeof(allocation_state_t)) == 0) {
             insert_delay(); // simulate storage access delay (to freeinode_ts)
         }
 
@@ -111,7 +111,13 @@ int inode_create(inode_type n_type) {
                 }
 
                 inode_table[inumber].i_size = BLOCK_SIZE;
-                inode_table[inumber].i_data_block = b;
+                /* For simplificaion, a directory will only use the first entry
+                 * of the array of data_blocks */
+                inode_table[inumber].i_data_blocks[0] = b;
+                for (int i = 1; i < INODE_DIRECT_BLOCK_SIZE; i++) {
+                    inode_table[inumber].i_data_blocks[i] = -1;
+                }
+                inode_table[inumber].i_indirect_block = -1;
 
                 dir_entry_t *dir_entry = (dir_entry_t *)data_block_get(b);
                 if (dir_entry == NULL) {
@@ -125,7 +131,11 @@ int inode_create(inode_type n_type) {
             } else {
                 /* In case of a new file, simply sets its size to 0 */
                 inode_table[inumber].i_size = 0;
-                inode_table[inumber].i_data_block = -1;
+
+                for (int i = 0; i < INODE_DIRECT_BLOCK_SIZE; i++) {
+                    inode_table[inumber].i_data_blocks[i] = -1;
+                }
+                inode_table[inumber].i_indirect_block = -1;
             }
             return inumber;
         }
@@ -149,6 +159,12 @@ int inode_delete(int inumber) {
     }
 
     freeinode_ts[inumber] = FREE;
+
+    int data_block_i = 0;
+    size_t remaining_size = inode_table[inumber].i_size;
+
+    while (remaining_size > 0 && data_block_i < INODE_DIRECT_BLOCK_SIZE) {
+    }
 
     if (inode_table[inumber].i_size > 0) {
         if (data_block_free(inode_table[inumber].i_data_block) == -1) {
@@ -256,7 +272,7 @@ int find_in_dir(int inumber, char const *sub_name) {
  */
 int data_block_alloc() {
     for (int i = 0; i < DATA_BLOCKS; i++) {
-        if (i * (int) sizeof(allocation_state_t) % BLOCK_SIZE == 0) {
+        if (i * (int)sizeof(allocation_state_t) % BLOCK_SIZE == 0) {
             insert_delay(); // simulate storage access delay to free_blocks
         }
 
@@ -339,4 +355,16 @@ open_file_entry_t *get_open_file_entry(int fhandle) {
         return NULL;
     }
     return &open_file_table[fhandle];
+}
+
+int inode_get_block_number_at_index(inode_t *inode, int index) {
+    if ((index + 1) * BLOCK_SIZE > inode->i_size) {
+        return -1;
+    }
+
+    if (index >= INODE_DIRECT_BLOCK_SIZE) {
+        // TODO (ir buscar ao bloco indireto)
+    } else {
+        return inode->i_data_blocks[index];
+    }
 }
