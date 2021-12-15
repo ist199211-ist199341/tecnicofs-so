@@ -160,18 +160,24 @@ int inode_delete(int inumber) {
 
     freeinode_ts[inumber] = FREE;
 
-    int data_block_i = 0;
     size_t remaining_size = inode_table[inumber].i_size;
+    // TODO should be int, but needs casting
+    size_t data_block_i = remaining_size / BLOCK_SIZE;
 
-    while (remaining_size > 0 && data_block_i < INODE_DIRECT_BLOCK_SIZE) {
-    }
-
-    if (inode_table[inumber].i_size > 0) {
-        if (data_block_free(inode_table[inumber].i_data_block) == -1) {
+    // TODO what happens if we an error occurrs while deleting the inode?
+    while (remaining_size > 0) {
+        int i_data_block = inode_get_block_number_at_index(
+            &inode_table[inumber], (int)data_block_i);
+        if (i_data_block == -1) {
             return -1;
         }
-    }
+        if (data_block_free(i_data_block) == -1) {
+            return -1;
+        }
 
+        --data_block_i;
+        remaining_size -= BLOCK_SIZE;
+    }
     /* TODO: handle non-empty directories (either return error, or recursively
      * delete children */
 
@@ -216,8 +222,9 @@ int add_dir_entry(int inumber, int sub_inumber, char const *sub_name) {
     }
 
     /* Locates the block containing the directory's entries */
+    // TODO directories only occupy one block at the moment
     dir_entry_t *dir_entry =
-        (dir_entry_t *)data_block_get(inode_table[inumber].i_data_block);
+        (dir_entry_t *)data_block_get(inode_table[inumber].i_data_blocks[0]);
     if (dir_entry == NULL) {
         return -1;
     }
@@ -249,8 +256,9 @@ int find_in_dir(int inumber, char const *sub_name) {
     }
 
     /* Locates the block containing the directory's entries */
+    // TODO directories only occupy one block at the moment
     dir_entry_t *dir_entry =
-        (dir_entry_t *)data_block_get(inode_table[inumber].i_data_block);
+        (dir_entry_t *)data_block_get(inode_table[inumber].i_data_blocks[0]);
     if (dir_entry == NULL) {
         return -1;
     }
@@ -363,8 +371,31 @@ int inode_get_block_number_at_index(inode_t *inode, int index) {
     }
 
     if (index >= INODE_DIRECT_BLOCK_SIZE) {
-        // TODO (ir buscar ao bloco indireto)
+        int *block = data_block_get(inode->i_indirect_block);
+        if (block == NULL) {
+            return -1;
+        }
+        return block[index - INODE_DIRECT_BLOCK_SIZE];
     } else {
         return inode->i_data_blocks[index];
+    }
+}
+
+void inode_set_block_number_at_index(inode_t *inode, int index,
+                                     int i_block_number) {
+    if ((index + 1) * BLOCK_SIZE > inode->i_size) {
+        // TODO return -1;
+        return;
+    }
+
+    if (index >= INODE_DIRECT_BLOCK_SIZE) {
+        int *block = data_block_get(inode->i_indirect_block);
+        if (block == NULL) {
+            // TODO return -1;
+            return;
+        }
+        block[index - INODE_DIRECT_BLOCK_SIZE] = i_block_number;
+    } else {
+        inode->i_data_blocks[index] = i_block_number;
     }
 }
