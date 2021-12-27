@@ -364,7 +364,12 @@ open_file_entry_t *get_open_file_entry(int fhandle) {
     }
     return &open_file_table[fhandle];
 }
-
+/*
+ * Inputs:
+ * 	 - inode
+ * 	 - index
+ * Returns: Returns the index of the data block if sucessful,// TODO NULL
+ */
 int inode_get_block_number_at_index(inode_t *inode, int index) {
     if ((index + 1) * BLOCK_SIZE > inode->i_size) {
         return -1;

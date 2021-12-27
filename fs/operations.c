@@ -72,6 +72,7 @@ int tfs_open(char const *name, int flags) {
                     --current_block_i;
                     remaining_size -= BLOCK_SIZE;
                 }
+                // TODO  Wrong value
                 inode->i_size = 0;
             }
         }
@@ -125,6 +126,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
     if (to_write + file->of_offset > BLOCK_SIZE * INODE_BLOCK_COUNT) {
         to_write = BLOCK_SIZE * INODE_BLOCK_COUNT - file->of_offset;
     }
+
     // TODO should be int, but needs casting
     size_t current_block_i = file->of_offset / BLOCK_SIZE;
     size_t written = to_write;
@@ -136,8 +138,11 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
             to_write_block = to_write;
         }
 
+        /* If empty file, allocate new block */
         if (inode->i_size <= current_block_i * BLOCK_SIZE) {
-            /* If empty file, allocate new block */
+
+            // TODO check if it's supposed to do this
+            inode->i_size += BLOCK_SIZE;
             inode_set_block_number_at_index(inode, (int)current_block_i,
                                             data_block_alloc());
         }
@@ -189,7 +194,6 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
 
     // TODO should be int, but needs casting
     size_t current_block_i = file->of_offset / BLOCK_SIZE;
-    size_t read = to_read;
 
     while (to_read > 0) {
         size_t to_read_block = BLOCK_SIZE - (file->of_offset % BLOCK_SIZE);
@@ -215,5 +219,5 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
         to_read -= to_read_block;
     }
 
-    return (ssize_t)read;
+    return (ssize_t)strlen(buffer);
 }
