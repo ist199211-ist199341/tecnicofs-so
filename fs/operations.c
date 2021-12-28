@@ -223,3 +223,28 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
 
     return (ssize_t)read;
 }
+
+int tfs_copy_to_external_fs(char const *source_path, char const *dest_path) {
+
+    // open at the start of the file
+    int source_file = tfs_open(source_path, 0);
+    /* if file doesn't exist */
+    if (source_file == -1) {
+        return -1;
+    }
+    /* flag "w" - crates empty file, if it exists it clears the content :) */
+    FILE *dest_file = fopen(dest_path, "w");
+    if (dest_file == NULL) {
+        return -1;
+    }
+
+    char buffer[BLOCK_SIZE];
+
+    ssize_t read;
+
+    while ((read = tfs_read(source_file, buffer, BLOCK_SIZE)) > 0)
+        fwrite(buffer, sizeof(char), (size_t)read, dest_file);
+
+    fclose(dest_file);
+    return 0;
+}

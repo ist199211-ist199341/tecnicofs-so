@@ -1,3 +1,16 @@
 operations.o: fs/operations.c fs/operations.h fs/config.h fs/state.h
 state.o: fs/state.c fs/state.h fs/config.h
+copy_to_external_errors.o: tests/copy_to_external_errors.c \
+ fs/operations.h fs/config.h fs/state.h
+copy_to_external_simple.o: tests/copy_to_external_simple.c \
+ fs/operations.h fs/config.h fs/state.h
+shrek2.o: tests/shrek2.c fs/operations.h fs/config.h fs/state.h
+shrek.o: tests/shrek.c fs/operations.h fs/config.h fs/state.h
 test1.o: tests/test1.c fs/operations.h fs/config.h fs/state.h
+write_10_blocks_simple.o: tests/write_10_blocks_simple.c \
+ tests/../fs/operations.h tests/../fs/config.h tests/../fs/state.h
+write_10_blocks_spill.o: tests/write_10_blocks_spill.c \
+ tests/../fs/operations.h tests/../fs/config.h tests/../fs/state.h
+write_more_than_10_blocks_simple.o: \
+ tests/write_more_than_10_blocks_simple.c fs/operations.h fs/config.h \
+ fs/state.h
