@@ -226,7 +226,7 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
 
 int tfs_copy_to_external_fs(char const *source_path, char const *dest_path) {
 
-    // open in format read
+    // open at the start of the file
     int source_file = tfs_open(source_path, 0);
     /* if file doesn't exist */
     if (source_file == -1) {
