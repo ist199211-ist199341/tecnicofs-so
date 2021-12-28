@@ -90,7 +90,7 @@ void state_destroy() { /* nothing to do */
  */
 int inode_create(inode_type n_type) {
     for (int inumber = 0; inumber < INODE_TABLE_SIZE; inumber++) {
-        if ((inumber * (int)sizeof(allocation_state_t)) == 0) {
+        if ((inumber * (int)sizeof(allocation_state_t) % BLOCK_SIZE) == 0) {
             insert_delay(); // simulate storage access delay (to freeinode_ts)
         }
 
@@ -104,8 +104,8 @@ int inode_create(inode_type n_type) {
             if (n_type == T_DIRECTORY) {
                 /* Initializes directory (filling its block with empty
                  * entries, labeled with inumber==-1) */
-                int b = data_block_alloc();
-                if (b == -1) {
+                int indirect_block_number = data_block_alloc();
+                if (indirect_block_number == -1) {
                     freeinode_ts[inumber] = FREE;
                     return -1;
                 }
@@ -113,13 +113,14 @@ int inode_create(inode_type n_type) {
                 inode_table[inumber].i_size = BLOCK_SIZE;
                 /* For simplificaion, a directory will only use the first entry
                  * of the array of data_blocks */
-                inode_table[inumber].i_data_blocks[0] = b;
+                inode_table[inumber].i_data_blocks[0] = indirect_block_number;
                 for (int i = 1; i < INODE_DIRECT_BLOCK_SIZE; i++) {
                     inode_table[inumber].i_data_blocks[i] = -1;
                 }
                 inode_table[inumber].i_indirect_block = -1;
 
-                dir_entry_t *dir_entry = (dir_entry_t *)data_block_get(b);
+                dir_entry_t *dir_entry =
+                    (dir_entry_t *)data_block_get(indirect_block_number);
                 if (dir_entry == NULL) {
                     freeinode_ts[inumber] = FREE;
                     return -1;
@@ -364,14 +365,15 @@ open_file_entry_t *get_open_file_entry(int fhandle) {
     }
     return &open_file_table[fhandle];
 }
-/*
+/* // TODO
  * Inputs:
  * 	 - inode
  * 	 - index
  * Returns: Returns the index of the data block if sucessful,// TODO NULL
  */
 int inode_get_block_number_at_index(inode_t *inode, int index) {
-    if ((index + 1) * BLOCK_SIZE > inode->i_size) {
+    // TODO
+    if (index * BLOCK_SIZE > inode->i_size) {
         return -1;
     }
 
@@ -386,21 +388,38 @@ int inode_get_block_number_at_index(inode_t *inode, int index) {
     }
 }
 
-void inode_set_block_number_at_index(inode_t *inode, int index,
-                                     int i_block_number) {
-    if ((index + 1) * BLOCK_SIZE > inode->i_size) {
-        // TODO return -1;
-        return;
+/* //TODO
+ * Inputs:
+ * 	 - inode
+ * 	 - index
+ * 	 - i_block_number
+ * Returns: Returns 0 on success, -1 on failure
+ */
+int inode_set_block_number_at_index(inode_t *inode, int index,
+                                    int i_block_number) {
+    // Allow adding a new block if it's immediately after the last block of the
+    // i_node
+    // TODO
+    if (index * BLOCK_SIZE > inode->i_size) {
+        return -1;
     }
-
+    // if index is in the indirect block
     if (index >= INODE_DIRECT_BLOCK_SIZE) {
         int *block = data_block_get(inode->i_indirect_block);
         if (block == NULL) {
-            // TODO return -1;
-            return;
+            int indirect_block_number = data_block_alloc();
+            if (indirect_block_number == -1) {
+                return -1;
+            }
+            inode->i_indirect_block = indirect_block_number;
+            block = data_block_get(indirect_block_number);
+            if (block == NULL) {
+                return -1;
+            }
         }
         block[index - INODE_DIRECT_BLOCK_SIZE] = i_block_number;
     } else {
         inode->i_data_blocks[index] = i_block_number;
     }
+    return 0;
 }
