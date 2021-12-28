@@ -40,12 +40,7 @@ int main() {
 
     tfs_copy_to_external_fs(path, "fs.txt");
 
-    f = tfs_open(path, 0);
-    assert(f != -1);
-
-    assert(tfs_close(f) != -1);
-
-    printf("\nSuccessful test.\n");
+    printf("Successful test.\n");
 
     return 0;
 }
