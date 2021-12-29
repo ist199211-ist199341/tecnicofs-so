@@ -1,8 +1,10 @@
 #include "operations.h"
+#include <pthread.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 int tfs_init() {
     state_init();
@@ -55,7 +57,10 @@ int tfs_open(char const *name, int flags) {
 
         /* Truncate (if requested) */
         if (flags & TFS_O_TRUNC) {
+
             if (inode->i_size > 0) {
+                pthread_rwlock_t rwl = PTHREAD_RWLOCK_INITIALIZER;
+                pthread_rwlock_wrlock(&rwl);
                 size_t remaining_size = inode->i_size;
                 // TODO should be int, but needs casting
                 size_t current_block_i = remaining_size / BLOCK_SIZE;
@@ -74,6 +79,7 @@ int tfs_open(char const *name, int flags) {
                 }
                 // TODO  Wrong value
                 inode->i_size = 0;
+                pthread_rwlock_unlock(&rwl);
             }
         }
         /* Determine initial offset */
@@ -130,8 +136,10 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
     // TODO should be int, but needs casting
     size_t current_block_i = file->of_offset / BLOCK_SIZE;
     size_t written = to_write;
-
+    pthread_rwlock_t rwl = PTHREAD_RWLOCK_INITIALIZER;
+    pthread_rwlock_wrlock(&rwl);
     while (to_write > 0) {
+
         size_t to_write_block = BLOCK_SIZE - (file->of_offset % BLOCK_SIZE);
         /* if remaining to_write does not fill the whole block */
         if (to_write_block > to_write) {
@@ -144,10 +152,12 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
             int new_block = data_block_alloc();
             if (new_block < 0) {
                 /* If it gets an error to alloc block */
+                pthread_rwlock_unlock(&rwl);
                 return -1;
             }
             if (inode_set_block_number_at_index(inode, (int)current_block_i,
                                                 new_block) < 0) {
+                pthread_rwlock_unlock(&rwl);
                 return -1;
             }
         }
@@ -155,6 +165,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
         void *block = data_block_get(
             inode_get_block_number_at_index(inode, (int)current_block_i));
         if (block == NULL) {
+            pthread_rwlock_unlock(&rwl);
             return -1;
         }
 
@@ -171,7 +182,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
         ++current_block_i;
         to_write -= to_write_block;
     }
-
+    pthread_rwlock_unlock(&rwl);
     return (ssize_t)written;
 }
 
@@ -196,6 +207,8 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
     // TODO should be int, but needs casting
     size_t current_block_i = file->of_offset / BLOCK_SIZE;
     size_t read = to_read;
+    pthread_rwlock_t rwl = PTHREAD_RWLOCK_INITIALIZER;
+    pthread_rwlock_rdlock(&rwl);
 
     while (to_read > 0) {
         size_t to_read_block = BLOCK_SIZE - (file->of_offset % BLOCK_SIZE);
@@ -207,6 +220,7 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
         void *block = data_block_get(
             inode_get_block_number_at_index(inode, (int)current_block_i));
         if (block == NULL) {
+            pthread_rwlock_unlock(&rwl);
             return -1;
         }
 
@@ -220,7 +234,7 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
         ++current_block_i;
         to_read -= to_read_block;
     }
-
+    pthread_rwlock_unlock(&rwl);
     return (ssize_t)read;
 }
 
