@@ -5,7 +5,7 @@
 
 int main() {
 
-    char *str = "AAA! AAA! AAA! ";
+    char *str = "AAA! AAA! A";
     char *path = "/f1";
     char *path2 = "external_file.txt";
     char to_read[40];
@@ -25,7 +25,7 @@ int main() {
 
     assert(fp != NULL);
 
-    assert(fread(to_read, sizeof(char), strlen(str), fp) == strlen(str));
+    assert(fread(to_read, sizeof(char), strlen(str) + 1, fp) != strlen(str));
 
     assert(strcmp(str, to_read) == 0);
 

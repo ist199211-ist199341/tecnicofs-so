@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
+#include <threads.h>
+#include <unistd.h>
 
 /*
  * Directory entry
@@ -25,6 +27,7 @@ typedef struct {
     size_t i_size;
     int i_data_blocks[INODE_DIRECT_BLOCK_SIZE];
     int i_indirect_block;
+    pthread_rwlock_t rwl;
     /* in a real FS, more fields would exist here */
 } inode_t;
 

@@ -1,9 +1,11 @@
 #include "state.h"
 
+#include <pthread.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <threads.h>
 #include <unistd.h>
 
 /* Persistent FS state  (in reality, it should be maintained in secondary
@@ -129,6 +131,7 @@ int inode_create(inode_type n_type) {
                 for (size_t i = 0; i < MAX_DIR_ENTRIES; i++) {
                     dir_entry[i].d_inumber = -1;
                 }
+                pthread_rwlock_init(&inode_table[inumber].rwl, NULL);
             } else {
                 /* In case of a new file, simply sets its size to 0 */
                 inode_table[inumber].i_size = 0;
@@ -137,6 +140,7 @@ int inode_create(inode_type n_type) {
                     inode_table[inumber].i_data_blocks[i] = -1;
                 }
                 inode_table[inumber].i_indirect_block = -1;
+                pthread_rwlock_init(&inode_table[inumber].rwl, NULL);
             }
             return inumber;
         }
@@ -181,6 +185,7 @@ int inode_delete(int inumber) {
     }
     /* TODO: handle non-empty directories (either return error, or recursively
      * delete children */
+    pthread_rwlock_destroy(&inode_table[inumber].rwl);
 
     return 0;
 }
@@ -280,6 +285,8 @@ int find_in_dir(int inumber, char const *sub_name) {
  * Returns: block index if successful, -1 otherwise
  */
 int data_block_alloc() {
+    pthread_rwlock_t rwl = PTHREAD_RWLOCK_INITIALIZER;
+    pthread_rwlock_wrlock(&rwl);
     for (int i = 0; i < DATA_BLOCKS; i++) {
         if (i * (int)sizeof(allocation_state_t) % BLOCK_SIZE == 0) {
             insert_delay(); // simulate storage access delay to free_blocks
@@ -287,9 +294,11 @@ int data_block_alloc() {
 
         if (free_blocks[i] == FREE) {
             free_blocks[i] = TAKEN;
+            pthread_rwlock_unlock(&rwl);
             return i;
         }
     }
+    pthread_rwlock_unlock(&rwl);
     return -1;
 }
 
