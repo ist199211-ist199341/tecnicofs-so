@@ -27,8 +27,8 @@ int main() {
     pthread_join(tid[0], NULL);
     pthread_join(tid[1], NULL);
 
-    tfs_copy_to_external_fs("/f1", "fs1.txt");
-    tfs_copy_to_external_fs("/f3", "fs3.txt");
+    // tfs_copy_to_external_fs("/f1", "fs1.txt");
+    // tfs_copy_to_external_fs("/f3", "fs3.txt");
 
     printf("Successful test.\n");
     tfs_destroy();
@@ -43,22 +43,19 @@ void *function1(void *input) {
 
     int f;
     ssize_t r;
-    int m = 0;
     f = tfs_open(path, TFS_O_CREAT);
     assert(f != -1);
 
-    memset(buffer, 0, sizeof(buffer));
-    size_t bytes_read = fread(buffer, sizeof(char), strlen(buffer) + 1, fd);
+    size_t bytes_read = fread(buffer, sizeof(char), BUFFER_LEN, fd);
 
     while (bytes_read > 0) {
         /* read the contents of the file */
-        r = tfs_write(f, buffer, strlen(buffer));
-        assert(r == strlen(buffer));
-        memset(buffer, 0, sizeof(buffer));
-        bytes_read = fread(buffer, sizeof(char), strlen(buffer) + 1, fd);
-
-        m++;
+        r = tfs_write(f, buffer, bytes_read);
+        assert(r == bytes_read);
+        bytes_read = fread(buffer, sizeof(char), BUFFER_LEN, fd);
     }
+    tfs_close(f);
+    tfs_copy_to_external_fs("/f1", "fs1.txt");
 
     return NULL;
 }
@@ -70,22 +67,19 @@ void *function2(void *input) {
 
     int f;
     ssize_t r;
-    int m = 0;
     f = tfs_open(path, TFS_O_CREAT);
     assert(f != -1);
 
-    memset(buffer, 0, sizeof(buffer));
-    size_t bytes_read = fread(buffer, sizeof(char), strlen(buffer) + 1, fd);
+    size_t bytes_read = fread(buffer, sizeof(char), BUFFER_LEN, fd);
 
     while (bytes_read > 0) {
         /* read the contents of the file */
-        r = tfs_write(f, buffer, strlen(buffer));
-        assert(r == strlen(buffer));
-        memset(buffer, 0, sizeof(buffer));
-        bytes_read = fread(buffer, sizeof(char), strlen(buffer) + 1, fd);
-
-        m++;
+        r = tfs_write(f, buffer, bytes_read);
+        assert(r == bytes_read);
+        bytes_read = fread(buffer, sizeof(char), BUFFER_LEN, fd);
     }
+    tfs_close(f);
+    tfs_copy_to_external_fs("/f3", "fs3.txt");
 
     return NULL;
 }

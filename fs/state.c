@@ -18,6 +18,7 @@ static char freeinode_ts[INODE_TABLE_SIZE];
 /* Data blocks */
 static char fs_data[BLOCK_SIZE * DATA_BLOCKS];
 static char free_blocks[DATA_BLOCKS];
+static pthread_rwlock_t free_blocks_rwl[DATA_BLOCKS];
 
 /* Volatile FS state */
 
@@ -73,6 +74,7 @@ void state_init() {
 
     for (size_t i = 0; i < DATA_BLOCKS; i++) {
         free_blocks[i] = FREE;
+        pthread_rwlock_init(&free_blocks_rwl[i], NULL);
     }
 
     for (size_t i = 0; i < MAX_OPEN_FILES; i++) {
@@ -227,11 +229,15 @@ int add_dir_entry(int inumber, int sub_inumber, char const *sub_name) {
         return -1;
     }
 
+    inode_t *inode = &inode_table[inumber];
+    pthread_rwlock_wrlock(&inode->rwl);
+
     /* Locates the block containing the directory's entries */
     // TODO directories only occupy one block at the moment
     dir_entry_t *dir_entry =
-        (dir_entry_t *)data_block_get(inode_table[inumber].i_data_blocks[0]);
+        (dir_entry_t *)data_block_get(inode->i_data_blocks[0]);
     if (dir_entry == NULL) {
+        pthread_rwlock_unlock(&inode->rwl);
         return -1;
     }
 
@@ -241,10 +247,12 @@ int add_dir_entry(int inumber, int sub_inumber, char const *sub_name) {
             dir_entry[i].d_inumber = sub_inumber;
             strncpy(dir_entry[i].d_name, sub_name, MAX_FILE_NAME - 1);
             dir_entry[i].d_name[MAX_FILE_NAME - 1] = 0;
+            pthread_rwlock_unlock(&inode->rwl);
             return 0;
         }
     }
 
+    pthread_rwlock_unlock(&inode->rwl);
     return -1;
 }
 
@@ -261,11 +269,15 @@ int find_in_dir(int inumber, char const *sub_name) {
         return -1;
     }
 
+    inode_t *inode = &inode_table[inumber];
+    pthread_rwlock_rdlock(&inode->rwl);
+
     /* Locates the block containing the directory's entries */
     // TODO directories only occupy one block at the moment
     dir_entry_t *dir_entry =
-        (dir_entry_t *)data_block_get(inode_table[inumber].i_data_blocks[0]);
+        (dir_entry_t *)data_block_get(inode->i_data_blocks[0]);
     if (dir_entry == NULL) {
+        pthread_rwlock_unlock(&inode->rwl);
         return -1;
     }
 
@@ -274,9 +286,11 @@ int find_in_dir(int inumber, char const *sub_name) {
     for (int i = 0; i < MAX_DIR_ENTRIES; i++)
         if ((dir_entry[i].d_inumber != -1) &&
             (strncmp(dir_entry[i].d_name, sub_name, MAX_FILE_NAME) == 0)) {
+            pthread_rwlock_unlock(&inode->rwl);
             return dir_entry[i].d_inumber;
         }
 
+    pthread_rwlock_unlock(&inode->rwl);
     return -1;
 }
 
@@ -285,20 +299,25 @@ int find_in_dir(int inumber, char const *sub_name) {
  * Returns: block index if successful, -1 otherwise
  */
 int data_block_alloc() {
-    pthread_rwlock_t rwl = PTHREAD_RWLOCK_INITIALIZER;
-    pthread_rwlock_wrlock(&rwl);
     for (int i = 0; i < DATA_BLOCKS; i++) {
+        pthread_rwlock_rdlock(&free_blocks_rwl[i]);
+
         if (i * (int)sizeof(allocation_state_t) % BLOCK_SIZE == 0) {
             insert_delay(); // simulate storage access delay to free_blocks
         }
 
         if (free_blocks[i] == FREE) {
-            free_blocks[i] = TAKEN;
-            pthread_rwlock_unlock(&rwl);
-            return i;
+            pthread_rwlock_unlock(&free_blocks_rwl[i]);
+            pthread_rwlock_wrlock(&free_blocks_rwl[i]);
+            // recheck since we only had read lock
+            if (free_blocks[i] == FREE) {
+                free_blocks[i] = TAKEN;
+                pthread_rwlock_unlock(&free_blocks_rwl[i]);
+                return i;
+            }
         }
+        pthread_rwlock_unlock(&free_blocks_rwl[i]);
     }
-    pthread_rwlock_unlock(&rwl);
     return -1;
 }
 

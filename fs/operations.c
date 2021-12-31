@@ -126,18 +126,15 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
     if (inode == NULL) {
         return -1;
     }
-    pthread_rwlock_rdlock(&inode->rwl);
     /* Determine how many bytes to write */
     if (to_write + file->of_offset > BLOCK_SIZE * INODE_BLOCK_COUNT) {
         to_write = BLOCK_SIZE * INODE_BLOCK_COUNT - file->of_offset;
     }
     // TODO should be int, but needs casting
     size_t current_block_i = file->of_offset / BLOCK_SIZE;
-    pthread_rwlock_unlock(&inode->rwl);
-
-    pthread_rwlock_wrlock(&inode->rwl);
 
     size_t written = to_write;
+    pthread_rwlock_wrlock(&inode->rwl);
 
     while (to_write > 0) {
 
@@ -171,7 +168,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
         }
 
         /* Perform the actual write */
-        memcpy(block + file->of_offset, buffer, to_write_block);
+        memcpy(block + (file->of_offset % BLOCK_SIZE), buffer, to_write_block);
 
         /* The offset associated with the file handle is
          * incremented accordingly */
@@ -208,10 +205,8 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
 
     // TODO should be int, but needs casting
     size_t current_block_i = file->of_offset / BLOCK_SIZE;
-    pthread_rwlock_unlock(&inode->rwl);
 
     size_t read = to_read;
-    pthread_rwlock_wrlock(&inode->rwl);
 
     while (to_read > 0) {
         size_t to_read_block = BLOCK_SIZE - (file->of_offset % BLOCK_SIZE);
@@ -228,7 +223,7 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
         }
 
         /* Perform the actual read */
-        memcpy(buffer, block + file->of_offset, to_read_block);
+        memcpy(buffer, block + (file->of_offset % BLOCK_SIZE), to_read_block);
 
         /* The offset associated with the file handle is
          * incremented accordingly */
