@@ -14,7 +14,7 @@ INCLUDES = $(addprefix -I, $(INCLUDE_DIRS))
 SOURCES  := $(wildcard */*.c)
 HEADERS  := $(wildcard */*.h)
 OBJECTS  := $(SOURCES:.c=.o)
-TARGET_EXECS := tests/test1 tests/copy_to_external_simple tests/copy_to_external_errors tests/write_10_blocks_spill tests/write_10_blocks_simple tests/write_more_than_10_blocks_simple tests/shrek tests/shrek2 tests/multi_threading_1
+TARGET_EXECS := tests/test1 tests/copy_to_external_simple tests/copy_to_external_errors tests/write_10_blocks_spill tests/write_10_blocks_simple tests/write_more_than_10_blocks_simple tests/write_big_file tests/thread_write_new_files
 
 # VPATH is a variable used by Makefile which finds *sources* and makes them available throughout the codebase
 # vpath %.h <DIR> tells make to look for header files in <DIR>
@@ -75,9 +75,8 @@ tests/copy_to_external_simple: tests/copy_to_external_simple.o fs/operations.o f
 tests/write_10_blocks_spill: tests/write_10_blocks_spill.o fs/operations.o fs/state.o
 tests/write_10_blocks_simple: tests/write_10_blocks_simple.o fs/operations.o fs/state.o
 tests/write_more_than_10_blocks_simple: tests/write_more_than_10_blocks_simple.o fs/operations.o fs/state.o
-tests/shrek: tests/shrek.o fs/operations.o fs/state.o
-tests/shrek2: tests/shrek2.o fs/operations.o fs/state.o
-tests/multi_threading_1: tests/multi_threading_1.o fs/operations.o fs/state.o
+tests/write_big_file: tests/write_big_file.o fs/operations.o fs/state.o
+tests/thread_write_new_files: tests/thread_write_new_files.o fs/operations.o fs/state.o
 
 clean:
 	rm -f $(OBJECTS) $(TARGET_EXECS)
