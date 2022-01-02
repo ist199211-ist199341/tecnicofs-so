@@ -23,15 +23,16 @@ int main() {
     pthread_t tid[2];
     int operations[2] = {0, 1};
     assert(tfs_init() != -1);
-    FILE *fd = fopen(shrek[0], "r");
-
-    char *path = "/f1";
     char buffer[BUFFER_LEN];
+    int f;
+    ssize_t r;
 
     assert(tfs_init() != -1);
 
-    int f;
-    ssize_t r;
+    FILE *fd = fopen(shrek[0], "r");
+
+    char *path = shrek[8];
+
     f = tfs_open(path, TFS_O_CREAT);
     assert(f != -1);
 
@@ -44,27 +45,43 @@ int main() {
         bytes_read = fread(buffer, sizeof(char), BUFFER_LEN, fd);
     }
     tfs_close(f);
+
+    fd = fopen(shrek[1], "r");
+    path = shrek[9];
+    f = tfs_open(path, TFS_O_CREAT);
+    assert(f != -1);
+
+    bytes_read = fread(buffer, sizeof(char), BUFFER_LEN, fd);
+
+    while (bytes_read > 0) {
+        /* read the contents of the file */
+        r = tfs_write(f, buffer, bytes_read);
+        assert(r == bytes_read);
+        bytes_read = fread(buffer, sizeof(char), BUFFER_LEN, fd);
+    }
+    tfs_close(f);
+
     // A ORDEM IMPORTA :/
-    // append
-    if (pthread_create(&tid[0], NULL, function, &operations[1]) != 0)
-        exit(EXIT_FAILURE);
     // truncate
-    if (pthread_create(&tid[1], NULL, function, &operations[0]) != 0)
+    if (pthread_create(&tid[0], NULL, function, &operations[0]) != 0)
+        exit(EXIT_FAILURE);
+    // append
+    if (pthread_create(&tid[1], NULL, function, &operations[1]) != 0)
         exit(EXIT_FAILURE);
 
     pthread_join(tid[0], NULL);
     pthread_join(tid[1], NULL);
 
-    tfs_copy_to_external_fs(path, "append-trunc.txt");
+    tfs_copy_to_external_fs(shrek[8], "append-trunc1.txt");
+    tfs_copy_to_external_fs(shrek[9], "append-trunc2.txt");
     tfs_destroy();
-    printf("nvim append-trunc.txt\n");
     printf("Successful test.\n");
 
     return 0;
 }
 void *function(void *input) {
     int num = *((int *)input);
-    char *path = "/f1";
+    char *path = shrek[num + 8];
 
     char buffer[BUFFER_LEN];
     char letter = 'T' - (char)(num * ('T' - 'A'));
