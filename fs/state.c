@@ -18,7 +18,7 @@ static char freeinode_ts[INODE_TABLE_SIZE];
 /* Data blocks */
 static char fs_data[BLOCK_SIZE * DATA_BLOCKS];
 static char free_blocks[DATA_BLOCKS];
-static pthread_rwlock_t free_blocks_rwl[DATA_BLOCKS];
+static pthread_rwlock_t free_blocks_rwl;
 
 /* Volatile FS state */
 
@@ -74,8 +74,8 @@ void state_init() {
 
     for (size_t i = 0; i < DATA_BLOCKS; i++) {
         free_blocks[i] = FREE;
-        pthread_rwlock_init(&free_blocks_rwl[i], NULL);
     }
+    pthread_rwlock_init(&free_blocks_rwl, NULL);
 
     for (size_t i = 0; i < MAX_OPEN_FILES; i++) {
         free_open_file_entries[i] = FREE;
@@ -299,25 +299,25 @@ int find_in_dir(int inumber, char const *sub_name) {
  * Returns: block index if successful, -1 otherwise
  */
 int data_block_alloc() {
+    pthread_rwlock_rdlock(&free_blocks_rwl);
     for (int i = 0; i < DATA_BLOCKS; i++) {
-        pthread_rwlock_rdlock(&free_blocks_rwl[i]);
 
         if (i * (int)sizeof(allocation_state_t) % BLOCK_SIZE == 0) {
             insert_delay(); // simulate storage access delay to free_blocks
         }
 
         if (free_blocks[i] == FREE) {
-            pthread_rwlock_unlock(&free_blocks_rwl[i]);
-            pthread_rwlock_wrlock(&free_blocks_rwl[i]);
+            pthread_rwlock_unlock(&free_blocks_rwl);
+            pthread_rwlock_wrlock(&free_blocks_rwl);
             // recheck since we only had read lock
             if (free_blocks[i] == FREE) {
                 free_blocks[i] = TAKEN;
-                pthread_rwlock_unlock(&free_blocks_rwl[i]);
+                pthread_rwlock_unlock(&free_blocks_rwl);
                 return i;
             }
         }
-        pthread_rwlock_unlock(&free_blocks_rwl[i]);
     }
+    pthread_rwlock_unlock(&free_blocks_rwl);
     return -1;
 }
 
