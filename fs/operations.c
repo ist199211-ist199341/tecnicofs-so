@@ -59,13 +59,13 @@ int tfs_open(char const *name, int flags) {
         if (flags & TFS_O_TRUNC) {
 
             if (inode->i_size > 0) {
+
                 pthread_rwlock_wrlock(&inode->rwl);
                 size_t remaining_size = inode->i_size;
-                // TODO should be int, but needs casting
-                size_t current_block_i = remaining_size / BLOCK_SIZE;
-                while (remaining_size > 0) {
-                    int i_data_block = inode_get_block_number_at_index(
-                        inode, (int)current_block_i);
+                int current_block_i = (int)(remaining_size / BLOCK_SIZE);
+                while (current_block_i >= 0) {
+                    int i_data_block =
+                        inode_get_block_number_at_index(inode, current_block_i);
                     if (i_data_block == -1) {
                         return -1;
                     }
@@ -76,7 +76,6 @@ int tfs_open(char const *name, int flags) {
                     --current_block_i;
                     remaining_size -= BLOCK_SIZE;
                 }
-                // TODO  Wrong value
                 inode->i_size = 0;
                 pthread_rwlock_unlock(&inode->rwl);
             }

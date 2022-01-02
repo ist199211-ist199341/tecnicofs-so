@@ -45,7 +45,7 @@ int main() {
     pthread_join(tid[1], NULL);
 
     printf("Successful test.\n");
-    tfs_destroy();
+    assert(tfs_destroy() == 0);
     return 0;
 }
 
@@ -55,9 +55,7 @@ void *write_fn(void *input) {
 
     char buffer[BUFFER_LEN];
 
-    char path[4];
-
-    strncpy(path, shrek[num + 7], 3);
+    char *path = shrek[num + 7];
 
     int f;
     ssize_t r;
@@ -72,7 +70,7 @@ void *write_fn(void *input) {
         assert(r == bytes_read);
         bytes_read = fread(buffer, sizeof(char), BUFFER_LEN, fd);
     }
-    tfs_close(f);
+    assert(tfs_close(f) == 0);
     printf("diff %s %s\n", shrek[num - 1], shrek[num + 3]);
     return NULL;
 }
@@ -80,6 +78,6 @@ void *write_fn(void *input) {
 void *read_fn(void *input) {
     char *path = input;
     int number = path[2] - '0';
-    tfs_copy_to_external_fs(path, shrek[number + 7]);
+    assert(tfs_copy_to_external_fs(path, shrek[number + 3]) == 0);
     return NULL;
 }

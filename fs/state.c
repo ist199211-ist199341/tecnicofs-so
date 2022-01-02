@@ -168,13 +168,12 @@ int inode_delete(int inumber) {
     freeinode_ts[inumber] = FREE;
 
     size_t remaining_size = inode_table[inumber].i_size;
-    // TODO should be int, but needs casting
-    size_t data_block_i = remaining_size / BLOCK_SIZE;
+    int data_block_i = (int)(remaining_size / BLOCK_SIZE);
 
     // TODO what happens if we an error occurrs while deleting the inode?
-    while (remaining_size > 0) {
+    while (data_block_i >= 0) {
         int i_data_block = inode_get_block_number_at_index(
-            &inode_table[inumber], (int)data_block_i);
+            &inode_table[inumber], data_block_i);
         if (i_data_block == -1) {
             return -1;
         }
@@ -183,7 +182,11 @@ int inode_delete(int inumber) {
         }
 
         --data_block_i;
-        remaining_size -= BLOCK_SIZE;
+        if (remaining_size < BLOCK_SIZE)
+            remaining_size = 0;
+        else {
+            remaining_size -= BLOCK_SIZE;
+        }
     }
     /* TODO: handle non-empty directories (either return error, or recursively
      * delete children */
