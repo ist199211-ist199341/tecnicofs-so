@@ -75,7 +75,10 @@ void state_init() {
     for (size_t i = 0; i < DATA_BLOCKS; i++) {
         free_blocks[i] = FREE;
     }
-    pthread_rwlock_init(&free_blocks_rwl, NULL);
+    if (pthread_rwlock_init(&free_blocks_rwl, NULL) != 0) {
+        perror("Failed to init RWlock");
+        exit(EXIT_FAILURE);
+    };
 
     for (size_t i = 0; i < MAX_OPEN_FILES; i++) {
         free_open_file_entries[i] = FREE;
@@ -83,6 +86,10 @@ void state_init() {
 }
 
 void state_destroy() { /* nothing to do */
+    if (pthread_rwlock_destroy(&free_blocks_rwl) != 0) {
+        perror("Failed to destroy RWlock");
+        exit(EXIT_FAILURE);
+    }
 }
 
 /*
@@ -133,7 +140,6 @@ int inode_create(inode_type n_type) {
                 for (size_t i = 0; i < MAX_DIR_ENTRIES; i++) {
                     dir_entry[i].d_inumber = -1;
                 }
-                pthread_rwlock_init(&inode_table[inumber].rwl, NULL);
             } else {
                 /* In case of a new file, simply sets its size to 0 */
                 inode_table[inumber].i_size = 0;
@@ -142,8 +148,12 @@ int inode_create(inode_type n_type) {
                     inode_table[inumber].i_data_blocks[i] = -1;
                 }
                 inode_table[inumber].i_indirect_block = -1;
-                pthread_rwlock_init(&inode_table[inumber].rwl, NULL);
             }
+            if (pthread_rwlock_init(&inode_table[inumber].rwl, NULL) != 0) {
+                perror("Failed to init RWLock");
+                exit(EXIT_FAILURE);
+            }
+
             return inumber;
         }
     }
@@ -190,7 +200,10 @@ int inode_delete(int inumber) {
     }
     /* TODO: handle non-empty directories (either return error, or recursively
      * delete children */
-    pthread_rwlock_destroy(&inode_table[inumber].rwl);
+    if (pthread_rwlock_destroy(&inode_table[inumber].rwl) != 0) {
+        perror("Failed to destroy RWLock");
+        exit(EXIT_FAILURE);
+    }
 
     return 0;
 }
@@ -233,14 +246,20 @@ int add_dir_entry(int inumber, int sub_inumber, char const *sub_name) {
     }
 
     inode_t *inode = &inode_table[inumber];
-    pthread_rwlock_wrlock(&inode->rwl);
+    if (pthread_rwlock_wrlock(&inode->rwl) != 0) {
+        perror("Failed to lock RWLock");
+        exit(EXIT_FAILURE);
+    }
 
     /* Locates the block containing the directory's entries */
     // TODO directories only occupy one block at the moment
     dir_entry_t *dir_entry =
         (dir_entry_t *)data_block_get(inode->i_data_blocks[0]);
     if (dir_entry == NULL) {
-        pthread_rwlock_unlock(&inode->rwl);
+        if (pthread_rwlock_unlock(&inode->rwl) != 0) {
+            perror("Failed to unlock RWLock");
+            exit(EXIT_FAILURE);
+        }
         return -1;
     }
 
@@ -250,12 +269,18 @@ int add_dir_entry(int inumber, int sub_inumber, char const *sub_name) {
             dir_entry[i].d_inumber = sub_inumber;
             strncpy(dir_entry[i].d_name, sub_name, MAX_FILE_NAME - 1);
             dir_entry[i].d_name[MAX_FILE_NAME - 1] = 0;
-            pthread_rwlock_unlock(&inode->rwl);
+            if (pthread_rwlock_unlock(&inode->rwl) != 0) {
+                perror("Failed to unlock RWLock");
+                exit(EXIT_FAILURE);
+            }
             return 0;
         }
     }
 
-    pthread_rwlock_unlock(&inode->rwl);
+    if (pthread_rwlock_unlock(&inode->rwl) != 0) {
+        perror("Failed to unlock RWLock");
+        exit(EXIT_FAILURE);
+    }
     return -1;
 }
 
@@ -273,14 +298,20 @@ int find_in_dir(int inumber, char const *sub_name) {
     }
 
     inode_t *inode = &inode_table[inumber];
-    pthread_rwlock_rdlock(&inode->rwl);
+    if (pthread_rwlock_rdlock(&inode->rwl) != 0) {
+        perror("Failed to lock RWLock");
+        exit(EXIT_FAILURE);
+    }
 
     /* Locates the block containing the directory's entries */
     // TODO directories only occupy one block at the moment
     dir_entry_t *dir_entry =
         (dir_entry_t *)data_block_get(inode->i_data_blocks[0]);
     if (dir_entry == NULL) {
-        pthread_rwlock_unlock(&inode->rwl);
+        if (pthread_rwlock_unlock(&inode->rwl) != 0) {
+            perror("Failed to unlock RWLock");
+            exit(EXIT_FAILURE);
+        }
         return -1;
     }
 
@@ -289,11 +320,17 @@ int find_in_dir(int inumber, char const *sub_name) {
     for (int i = 0; i < MAX_DIR_ENTRIES; i++)
         if ((dir_entry[i].d_inumber != -1) &&
             (strncmp(dir_entry[i].d_name, sub_name, MAX_FILE_NAME) == 0)) {
-            pthread_rwlock_unlock(&inode->rwl);
+            if (pthread_rwlock_unlock(&inode->rwl) != 0) {
+                perror("Failed to unlock RWLock");
+                exit(EXIT_FAILURE);
+            }
             return dir_entry[i].d_inumber;
         }
 
-    pthread_rwlock_unlock(&inode->rwl);
+    if (pthread_rwlock_unlock(&inode->rwl) != 0) {
+        perror("Failed to unlock RWLock");
+        exit(EXIT_FAILURE);
+    }
     return -1;
 }
 
@@ -302,7 +339,11 @@ int find_in_dir(int inumber, char const *sub_name) {
  * Returns: block index if successful, -1 otherwise
  */
 int data_block_alloc() {
-    pthread_rwlock_rdlock(&free_blocks_rwl);
+    if (pthread_rwlock_rdlock(&free_blocks_rwl) != 0) {
+        perror("Failed to lock RWLock");
+        exit(EXIT_FAILURE);
+    }
+
     for (int i = 0; i < DATA_BLOCKS; i++) {
 
         if (i * (int)sizeof(allocation_state_t) % BLOCK_SIZE == 0) {
@@ -310,17 +351,30 @@ int data_block_alloc() {
         }
 
         if (free_blocks[i] == FREE) {
-            pthread_rwlock_unlock(&free_blocks_rwl);
-            pthread_rwlock_wrlock(&free_blocks_rwl);
+            if (pthread_rwlock_unlock(&free_blocks_rwl) != 0) {
+                perror("Failed to unlock RWLock");
+                exit(EXIT_FAILURE);
+            }
+            if (pthread_rwlock_wrlock(&free_blocks_rwl) != 0) {
+                perror("Failed to lock RWLock");
+                exit(EXIT_FAILURE);
+            }
             // recheck since we only had read lock
             if (free_blocks[i] == FREE) {
                 free_blocks[i] = TAKEN;
-                pthread_rwlock_unlock(&free_blocks_rwl);
+                if (pthread_rwlock_unlock(&free_blocks_rwl) != 0) {
+
+                    perror("Failed to unlock RWLock");
+                    exit(EXIT_FAILURE);
+                }
                 return i;
             }
         }
     }
-    pthread_rwlock_unlock(&free_blocks_rwl);
+    if (pthread_rwlock_unlock(&free_blocks_rwl) != 0) {
+        perror("Failed to unlock RWLock");
+        exit(EXIT_FAILURE);
+    }
     return -1;
 }
 
