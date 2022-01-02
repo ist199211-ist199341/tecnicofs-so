@@ -17,49 +17,16 @@ char *shrek[12] = {"shrek1.txt",    "shrek2.txt",    "shrek3.txt",
                    "/f2",           "/f3",           "/f4"};
 
 void *function(void *input);
+void write_fn(int input);
 
 int main() {
 
     pthread_t tid[2];
     int operations[2] = {0, 1};
     assert(tfs_init() != -1);
-    char buffer[BUFFER_LEN];
-    int f;
-    ssize_t r;
 
-    assert(tfs_init() != -1);
-
-    FILE *fd = fopen(shrek[0], "r");
-
-    char *path = shrek[8];
-
-    f = tfs_open(path, TFS_O_CREAT);
-    assert(f != -1);
-
-    size_t bytes_read = fread(buffer, sizeof(char), BUFFER_LEN, fd);
-
-    while (bytes_read > 0) {
-        /* read the contents of the file */
-        r = tfs_write(f, buffer, bytes_read);
-        assert(r == bytes_read);
-        bytes_read = fread(buffer, sizeof(char), BUFFER_LEN, fd);
-    }
-    tfs_close(f);
-
-    fd = fopen(shrek[1], "r");
-    path = shrek[9];
-    f = tfs_open(path, TFS_O_CREAT);
-    assert(f != -1);
-
-    bytes_read = fread(buffer, sizeof(char), BUFFER_LEN, fd);
-
-    while (bytes_read > 0) {
-        /* read the contents of the file */
-        r = tfs_write(f, buffer, bytes_read);
-        assert(r == bytes_read);
-        bytes_read = fread(buffer, sizeof(char), BUFFER_LEN, fd);
-    }
-    tfs_close(f);
+    write_fn(0);
+    write_fn(1);
 
     // A ORDEM IMPORTA :/
     // truncate
@@ -105,4 +72,28 @@ void *function(void *input) {
         assert(r == BUFFER_LEN);
     }
     return NULL;
+}
+
+void write_fn(int input) {
+
+    FILE *fd = fopen(shrek[input], "r");
+
+    char buffer[BUFFER_LEN];
+
+    char *path = shrek[input + 8];
+
+    int f;
+    ssize_t r;
+    f = tfs_open(path, TFS_O_CREAT);
+    assert(f != -1);
+
+    size_t bytes_read = fread(buffer, sizeof(char), BUFFER_LEN, fd);
+
+    while (bytes_read > 0) {
+        /* read the contents of the file */
+        r = tfs_write(f, buffer, bytes_read);
+        assert(r == bytes_read);
+        bytes_read = fread(buffer, sizeof(char), BUFFER_LEN, fd);
+    }
+    assert(tfs_close(f) == 0);
 }
