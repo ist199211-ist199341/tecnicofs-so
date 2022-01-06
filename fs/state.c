@@ -26,6 +26,7 @@ static pthread_rwlock_t free_blocks_rwl;
 
 static open_file_entry_t open_file_table[MAX_OPEN_FILES];
 static char free_open_file_entries[MAX_OPEN_FILES];
+static pthread_rwlock_t open_file_table_rwl;
 
 static inline bool valid_inumber(int inumber) {
     return inumber >= 0 && inumber < INODE_TABLE_SIZE;
@@ -93,6 +94,10 @@ void state_init() {
     for (size_t i = 0; i < MAX_OPEN_FILES; i++) {
         free_open_file_entries[i] = FREE;
     }
+    if (pthread_rwlock_init(&open_file_table_rwl, NULL) != 0) {
+        perror("Failed to init RWlock");
+        exit(EXIT_FAILURE);
+    };
 }
 
 void state_destroy() {
@@ -109,6 +114,11 @@ void state_destroy() {
     }
 
     if (pthread_rwlock_destroy(&free_blocks_rwl) != 0) {
+        perror("Failed to destroy RWlock");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pthread_rwlock_destroy(&open_file_table_rwl) != 0) {
         perror("Failed to destroy RWlock");
         exit(EXIT_FAILURE);
     }
@@ -426,14 +436,26 @@ void *data_block_get(int block_number) {
  * Returns: file handle if successful, -1 otherwise
  */
 int add_to_open_file_table(int inumber, size_t offset) {
+    rwl_rdlock(&open_file_table_rwl);
     for (int i = 0; i < MAX_OPEN_FILES; i++) {
         if (free_open_file_entries[i] == FREE) {
+            rwl_unlock(&open_file_table_rwl);
+            rwl_wrlock(&open_file_table_rwl);
+            if (free_open_file_entries[i] != FREE) {
+                // another thread might have gotten here while we changed the
+                // locks, therefore we need to let go and check next entry
+                rwl_unlock(&open_file_table_rwl);
+                rwl_rdlock(&open_file_table_rwl);
+                continue;
+            }
             free_open_file_entries[i] = TAKEN;
             open_file_table[i].of_inumber = inumber;
             open_file_table[i].of_offset = offset;
+            rwl_unlock(&open_file_table_rwl);
             return i;
         }
     }
+    rwl_unlock(&open_file_table_rwl);
     return -1;
 }
 
@@ -443,11 +465,14 @@ int add_to_open_file_table(int inumber, size_t offset) {
  * Returns 0 is success, -1 otherwise
  */
 int remove_from_open_file_table(int fhandle) {
+    rwl_wrlock(&open_file_table_rwl);
     if (!valid_file_handle(fhandle) ||
         free_open_file_entries[fhandle] != TAKEN) {
+        rwl_unlock(&open_file_table_rwl);
         return -1;
     }
     free_open_file_entries[fhandle] = FREE;
+    rwl_unlock(&open_file_table_rwl);
     return 0;
 }
 
