@@ -50,10 +50,6 @@ int inode_delete(int inumber);
 int inode_truncate(int inumber);
 inode_t *inode_get(int inumber);
 
-void inode_rwlock(int inumber);
-void inode_rdlock(int inumber);
-void inode_unlock(int inumber);
-
 int clear_dir_entry(int inumber, int sub_inumber);
 int add_dir_entry(int inumber, int sub_inumber, char const *sub_name);
 int find_in_dir(int inumber, char const *sub_name);
@@ -69,5 +65,9 @@ open_file_entry_t *get_open_file_entry(int fhandle);
 int inode_get_block_number_at_index(inode_t *inode, int index);
 int inode_set_block_number_at_index(inode_t *inode, int index,
                                     int i_block_number);
+
+void rwl_wrlock(pthread_rwlock_t *rwl);
+void rwl_rdlock(pthread_rwlock_t *rwl);
+void rwl_unlock(pthread_rwlock_t *rwl);
 
 #endif // STATE_H

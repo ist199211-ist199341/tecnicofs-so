@@ -6,6 +6,8 @@
 #include <string.h>
 #include <unistd.h>
 
+extern pthread_rwlock_t inode_locks[INODE_TABLE_SIZE]; /* TODO */
+
 int tfs_init() {
     state_init();
 
@@ -116,7 +118,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
     size_t current_block_i = file->of_offset / BLOCK_SIZE;
 
     size_t written = to_write;
-    inode_rwlock(inumber);
+    rwl_wrlock(&inode_locks[inumber]);
 
     while (to_write > 0) {
 
@@ -132,12 +134,12 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
             int new_block = data_block_alloc();
             if (new_block < 0) {
                 /* If it gets an error to alloc block */
-                inode_unlock(inumber);
+                rwl_unlock(&inode_locks[inumber]);
                 return -1;
             }
             if (inode_set_block_number_at_index(inode, (int)current_block_i,
                                                 new_block) < 0) {
-                inode_unlock(inumber);
+                rwl_unlock(&inode_locks[inumber]);
                 return -1;
             }
         }
@@ -145,7 +147,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
         void *block = data_block_get(
             inode_get_block_number_at_index(inode, (int)current_block_i));
         if (block == NULL) {
-            inode_unlock(inumber);
+            rwl_unlock(&inode_locks[inumber]);
             return -1;
         }
 
@@ -162,7 +164,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
         ++current_block_i;
         to_write -= to_write_block;
     }
-    inode_unlock(inumber);
+    rwl_unlock(&inode_locks[inumber]);
     return (ssize_t)written;
 }
 
@@ -178,7 +180,7 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
     if (inode == NULL) {
         return -1;
     }
-    inode_rdlock(inumber);
+    rwl_rdlock(&inode_locks[inumber]);
 
     /* Determine how many bytes to read */
     size_t to_read = inode->i_size - file->of_offset;
@@ -201,7 +203,7 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
         void *block = data_block_get(
             inode_get_block_number_at_index(inode, (int)current_block_i));
         if (block == NULL) {
-            inode_unlock(inumber);
+            rwl_unlock(&inode_locks[inumber]);
             return -1;
         }
 
@@ -215,7 +217,7 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
         ++current_block_i;
         to_read -= to_read_block;
     }
-    inode_unlock(inumber);
+    rwl_unlock(&inode_locks[inumber]);
     return (ssize_t)read;
 }
 
