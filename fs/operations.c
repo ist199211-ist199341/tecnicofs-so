@@ -59,31 +59,7 @@ int tfs_open(char const *name, int flags) {
         if (flags & TFS_O_TRUNC) {
 
             if (inode->i_size > 0) {
-
-                if (pthread_rwlock_wrlock(&inode->rwl) != 0) {
-                    perror("Failed to lock RWlock");
-                    exit(EXIT_FAILURE);
-                }
-                size_t remaining_size = inode->i_size;
-                int current_block_i = (int)(remaining_size / BLOCK_SIZE);
-                while (current_block_i >= 0) {
-                    int i_data_block =
-                        inode_get_block_number_at_index(inode, current_block_i);
-                    if (i_data_block == -1) {
-                        return -1;
-                    }
-                    if (data_block_free(i_data_block) == -1) {
-                        return -1;
-                    }
-
-                    --current_block_i;
-                    remaining_size -= BLOCK_SIZE;
-                }
-                inode->i_size = 0;
-                if (pthread_rwlock_unlock(&inode->rwl) != 0) {
-                    perror("Failed to unlock RWlock");
-                    exit(EXIT_FAILURE);
-                }
+                inode_truncate(inum);
             }
         }
         /* Determine initial offset */
@@ -127,7 +103,8 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
     }
 
     /* From the open file table entry, we get the inode */
-    inode_t *inode = inode_get(file->of_inumber);
+    int inumber = file->of_inumber;
+    inode_t *inode = inode_get(inumber);
     if (inode == NULL) {
         return -1;
     }
@@ -139,10 +116,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
     size_t current_block_i = file->of_offset / BLOCK_SIZE;
 
     size_t written = to_write;
-    if (pthread_rwlock_wrlock(&inode->rwl) != 0) {
-        perror("Failed to lock RWlock");
-        exit(EXIT_FAILURE);
-    }
+    inode_rwlock(inumber);
 
     while (to_write > 0) {
 
@@ -158,18 +132,12 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
             int new_block = data_block_alloc();
             if (new_block < 0) {
                 /* If it gets an error to alloc block */
-                if (pthread_rwlock_unlock(&inode->rwl) != 0) {
-                    perror("Failed to unlock RWlock");
-                    exit(EXIT_FAILURE);
-                }
+                inode_unlock(inumber);
                 return -1;
             }
             if (inode_set_block_number_at_index(inode, (int)current_block_i,
                                                 new_block) < 0) {
-                if (pthread_rwlock_unlock(&inode->rwl) != 0) {
-                    perror("Failed to unlock RWlock");
-                    exit(EXIT_FAILURE);
-                }
+                inode_unlock(inumber);
                 return -1;
             }
         }
@@ -177,10 +145,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
         void *block = data_block_get(
             inode_get_block_number_at_index(inode, (int)current_block_i));
         if (block == NULL) {
-            if (pthread_rwlock_unlock(&inode->rwl) != 0) {
-                perror("Failed to unlock RWlock");
-                exit(EXIT_FAILURE);
-            }
+            inode_unlock(inumber);
             return -1;
         }
 
@@ -197,10 +162,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
         ++current_block_i;
         to_write -= to_write_block;
     }
-    if (pthread_rwlock_unlock(&inode->rwl) != 0) {
-        perror("Failed to unlock RWlock");
-        exit(EXIT_FAILURE);
-    }
+    inode_unlock(inumber);
     return (ssize_t)written;
 }
 
@@ -211,14 +173,12 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
     }
 
     /* From the open file table entry, we get the inode */
-    inode_t *inode = inode_get(file->of_inumber);
+    int inumber = file->of_inumber;
+    inode_t *inode = inode_get(inumber);
     if (inode == NULL) {
         return -1;
     }
-    if (pthread_rwlock_rdlock(&inode->rwl) != 0) {
-        perror("Failed to lock RWlock");
-        exit(EXIT_FAILURE);
-    }
+    inode_rdlock(inumber);
 
     /* Determine how many bytes to read */
     size_t to_read = inode->i_size - file->of_offset;
@@ -241,7 +201,7 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
         void *block = data_block_get(
             inode_get_block_number_at_index(inode, (int)current_block_i));
         if (block == NULL) {
-            pthread_rwlock_unlock(&inode->rwl);
+            inode_unlock(inumber);
             return -1;
         }
 
@@ -255,10 +215,7 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
         ++current_block_i;
         to_read -= to_read_block;
     }
-    if (pthread_rwlock_unlock(&inode->rwl) != 0) {
-        perror("Failed to unlock RWlock");
-        exit(EXIT_FAILURE);
-    }
+    inode_unlock(inumber);
     return (ssize_t)read;
 }
 

@@ -13,6 +13,7 @@
 
 /* I-node table */
 static inode_t inode_table[INODE_TABLE_SIZE];
+static pthread_rwlock_t inode_locks[INODE_TABLE_SIZE];
 static char freeinode_ts[INODE_TABLE_SIZE];
 
 /* Data blocks */
@@ -70,6 +71,10 @@ static void insert_delay() {
 void state_init() {
     for (size_t i = 0; i < INODE_TABLE_SIZE; i++) {
         freeinode_ts[i] = FREE;
+        if (pthread_rwlock_init(&inode_locks[i], NULL) != 0) {
+            perror("Failed to init RWlock");
+            exit(EXIT_FAILURE);
+        }
     }
 
     for (size_t i = 0; i < DATA_BLOCKS; i++) {
@@ -85,7 +90,14 @@ void state_init() {
     }
 }
 
-void state_destroy() { /* nothing to do */
+void state_destroy() {
+    for (size_t i = 0; i < INODE_TABLE_SIZE; i++) {
+        if (pthread_rwlock_destroy(&inode_locks[i]) != 0) {
+            perror("Failed to destroy RWlock");
+            exit(EXIT_FAILURE);
+        }
+    }
+
     if (pthread_rwlock_destroy(&free_blocks_rwl) != 0) {
         perror("Failed to destroy RWlock");
         exit(EXIT_FAILURE);
@@ -149,10 +161,6 @@ int inode_create(inode_type n_type) {
                 }
                 inode_table[inumber].i_indirect_block = -1;
             }
-            if (pthread_rwlock_init(&inode_table[inumber].rwl, NULL) != 0) {
-                perror("Failed to init RWLock");
-                exit(EXIT_FAILURE);
-            }
 
             return inumber;
         }
@@ -177,13 +185,34 @@ int inode_delete(int inumber) {
 
     freeinode_ts[inumber] = FREE;
 
-    size_t remaining_size = inode_table[inumber].i_size;
-    int data_block_i = (int)(remaining_size / BLOCK_SIZE);
+    inode_truncate(inumber);
 
-    // TODO what happens if we an error occurrs while deleting the inode?
-    while (data_block_i >= 0) {
-        int i_data_block = inode_get_block_number_at_index(
-            &inode_table[inumber], data_block_i);
+    return 0;
+}
+
+/*
+ * Deletes all allocated blocks in i-node.
+ * Input:
+ *  - inumber: i-node's number
+ * Returns: 0 if successful, -1 if failed
+ */
+int inode_truncate(int inumber) {
+    insert_delay();
+
+    if (!valid_inumber(inumber)) {
+        return -1;
+    }
+
+    inode_rwlock(inumber);
+
+    inode_t *inode = &inode_table[inumber];
+
+    // TODO what happens if we an error occurs while deleting the inode?
+    size_t remaining_size = inode->i_size;
+    int current_block_i = (int)(remaining_size / BLOCK_SIZE);
+    while (current_block_i >= 0) {
+        int i_data_block =
+            inode_get_block_number_at_index(inode, current_block_i);
         if (i_data_block == -1) {
             return -1;
         }
@@ -191,19 +220,12 @@ int inode_delete(int inumber) {
             return -1;
         }
 
-        --data_block_i;
-        if (remaining_size < BLOCK_SIZE)
-            remaining_size = 0;
-        else {
-            remaining_size -= BLOCK_SIZE;
-        }
+        --current_block_i;
+        remaining_size -= BLOCK_SIZE;
     }
-    /* TODO: handle non-empty directories (either return error, or recursively
-     * delete children */
-    if (pthread_rwlock_destroy(&inode_table[inumber].rwl) != 0) {
-        perror("Failed to destroy RWLock");
-        exit(EXIT_FAILURE);
-    }
+    inode->i_size = 0;
+
+    inode_unlock(inumber);
 
     return 0;
 }
@@ -221,6 +243,30 @@ inode_t *inode_get(int inumber) {
 
     insert_delay(); // simulate storage access delay to i-node
     return &inode_table[inumber];
+}
+
+void inode_rwlock(int inumber) {
+    if (!valid_inumber(inumber) ||
+        pthread_rwlock_wrlock(&inode_locks[inumber]) != 0) {
+        perror("Failed to lock RWlock");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void inode_rdlock(int inumber) {
+    if (!valid_inumber(inumber) ||
+        pthread_rwlock_rdlock(&inode_locks[inumber]) != 0) {
+        perror("Failed to lock RWlock");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void inode_unlock(int inumber) {
+    if (!valid_inumber(inumber) ||
+        pthread_rwlock_unlock(&inode_locks[inumber]) != 0) {
+        perror("Failed to unlock RWlock");
+        exit(EXIT_FAILURE);
+    }
 }
 
 /*
@@ -246,7 +292,7 @@ int add_dir_entry(int inumber, int sub_inumber, char const *sub_name) {
     }
 
     inode_t *inode = &inode_table[inumber];
-    if (pthread_rwlock_wrlock(&inode->rwl) != 0) {
+    if (pthread_rwlock_wrlock(&inode_locks[inumber]) != 0) {
         perror("Failed to lock RWLock");
         exit(EXIT_FAILURE);
     }
@@ -256,7 +302,7 @@ int add_dir_entry(int inumber, int sub_inumber, char const *sub_name) {
     dir_entry_t *dir_entry =
         (dir_entry_t *)data_block_get(inode->i_data_blocks[0]);
     if (dir_entry == NULL) {
-        if (pthread_rwlock_unlock(&inode->rwl) != 0) {
+        if (pthread_rwlock_unlock(&inode_locks[inumber]) != 0) {
             perror("Failed to unlock RWLock");
             exit(EXIT_FAILURE);
         }
@@ -269,7 +315,7 @@ int add_dir_entry(int inumber, int sub_inumber, char const *sub_name) {
             dir_entry[i].d_inumber = sub_inumber;
             strncpy(dir_entry[i].d_name, sub_name, MAX_FILE_NAME - 1);
             dir_entry[i].d_name[MAX_FILE_NAME - 1] = 0;
-            if (pthread_rwlock_unlock(&inode->rwl) != 0) {
+            if (pthread_rwlock_unlock(&inode_locks[inumber]) != 0) {
                 perror("Failed to unlock RWLock");
                 exit(EXIT_FAILURE);
             }
@@ -277,7 +323,7 @@ int add_dir_entry(int inumber, int sub_inumber, char const *sub_name) {
         }
     }
 
-    if (pthread_rwlock_unlock(&inode->rwl) != 0) {
+    if (pthread_rwlock_unlock(&inode_locks[inumber]) != 0) {
         perror("Failed to unlock RWLock");
         exit(EXIT_FAILURE);
     }
@@ -298,7 +344,7 @@ int find_in_dir(int inumber, char const *sub_name) {
     }
 
     inode_t *inode = &inode_table[inumber];
-    if (pthread_rwlock_rdlock(&inode->rwl) != 0) {
+    if (pthread_rwlock_rdlock(&inode_locks[inumber]) != 0) {
         perror("Failed to lock RWLock");
         exit(EXIT_FAILURE);
     }
@@ -308,7 +354,7 @@ int find_in_dir(int inumber, char const *sub_name) {
     dir_entry_t *dir_entry =
         (dir_entry_t *)data_block_get(inode->i_data_blocks[0]);
     if (dir_entry == NULL) {
-        if (pthread_rwlock_unlock(&inode->rwl) != 0) {
+        if (pthread_rwlock_unlock(&inode_locks[inumber]) != 0) {
             perror("Failed to unlock RWLock");
             exit(EXIT_FAILURE);
         }
@@ -320,14 +366,14 @@ int find_in_dir(int inumber, char const *sub_name) {
     for (int i = 0; i < MAX_DIR_ENTRIES; i++)
         if ((dir_entry[i].d_inumber != -1) &&
             (strncmp(dir_entry[i].d_name, sub_name, MAX_FILE_NAME) == 0)) {
-            if (pthread_rwlock_unlock(&inode->rwl) != 0) {
+            if (pthread_rwlock_unlock(&inode_locks[inumber]) != 0) {
                 perror("Failed to unlock RWLock");
                 exit(EXIT_FAILURE);
             }
             return dir_entry[i].d_inumber;
         }
 
-    if (pthread_rwlock_unlock(&inode->rwl) != 0) {
+    if (pthread_rwlock_unlock(&inode_locks[inumber]) != 0) {
         perror("Failed to unlock RWLock");
         exit(EXIT_FAILURE);
     }
