@@ -199,7 +199,7 @@ int inode_delete(int inumber) {
 int inode_truncate(int inumber) {
     insert_delay();
 
-    if (!valid_inumber(inumber)) {
+    if (!valid_inumber(inumber) || freeinode_ts[inumber] == FREE) {
         return -1;
     }
 
@@ -338,6 +338,8 @@ int add_dir_entry(int inumber, int sub_inumber, char const *sub_name) {
  */
 int find_in_dir(int inumber, char const *sub_name) {
     insert_delay(); // simulate storage access delay to i-node with inumber
+    // TODO should we check if inode is not free (like on inode_delete for
+    // example)?
     if (!valid_inumber(inumber) ||
         inode_table[inumber].i_node_type != T_DIRECTORY) {
         return -1;
@@ -496,15 +498,14 @@ open_file_entry_t *get_open_file_entry(int fhandle) {
     }
     return &open_file_table[fhandle];
 }
-/* // TODO
+/*
  * Inputs:
- * 	 - inode
- * 	 - index
- * Returns: Returns the index of the data block if sucessful,// TODO NULL
+ *   - inode: pointer to the inode
+ *   - index: the index of the i_data_block to get
+ * Returns: Returns the index of the data block if sucessful, or -1 otherwise
  */
 int inode_get_block_number_at_index(inode_t *inode, int index) {
-    // TODO
-    if (index * BLOCK_SIZE > inode->i_size) {
+    if (index < 0 || index >= INODE_BLOCK_COUNT) {
         return -1;
     }
 
@@ -519,19 +520,18 @@ int inode_get_block_number_at_index(inode_t *inode, int index) {
     }
 }
 
-/* //TODO
+/*
  * Inputs:
- * 	 - inode
- * 	 - index
- * 	 - i_block_number
+ *   - inode: pointer to the inode
+ *   - index: the index of the i_data_block to set
+ *   - i_block_number: the block number to set the i_data_block to
  * Returns: Returns 0 on success, -1 on failure
  */
 int inode_set_block_number_at_index(inode_t *inode, int index,
                                     int i_block_number) {
     // Allow adding a new block if it's immediately after the last block of the
     // i_node
-    // TODO
-    if (index * BLOCK_SIZE > inode->i_size) {
+    if (index < 0 || index >= INODE_BLOCK_COUNT) {
         return -1;
     }
     // if index is in the indirect block
