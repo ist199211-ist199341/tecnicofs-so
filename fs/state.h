@@ -48,6 +48,7 @@ void state_destroy();
 int inode_create(inode_type n_type);
 int inode_delete(int inumber);
 int inode_truncate(int inumber);
+int inode_delete_data_blocks(inode_t *inode);
 inode_t *inode_get(int inumber);
 
 int clear_dir_entry(int inumber, int sub_inumber);

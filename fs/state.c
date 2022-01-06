@@ -213,13 +213,29 @@ int inode_delete(int inumber) {
     insert_delay();
     insert_delay();
 
-    if (!valid_inumber(inumber) || freeinode_ts[inumber] == FREE) {
+    if (!valid_inumber(inumber)) {
         return -1;
     }
 
-    freeinode_ts[inumber] = FREE;
+    rwl_wrlock(&freeinode_ts_rwl);
+    if (freeinode_ts[inumber] == FREE) {
+        rwl_unlock(&freeinode_ts_rwl);
+        return -1;
+    }
+    // TODO i don't think this will cause a deadlock, but maybe it'd be worth to
+    // add a trylock here instead (?)
+    rwl_wrlock(&inode_locks[inumber]);
 
-    inode_truncate(inumber);
+    freeinode_ts[inumber] = FREE;
+    inode_t *inode = &inode_table[inumber];
+    if (inode_delete_data_blocks(inode) < 0) {
+        rwl_unlock(&inode_locks[inumber]);
+        rwl_unlock(&freeinode_ts_rwl);
+        return -1;
+    }
+
+    rwl_unlock(&inode_locks[inumber]);
+    rwl_unlock(&freeinode_ts_rwl);
 
     return 0;
 }
@@ -231,6 +247,8 @@ int inode_delete(int inumber) {
  * Returns: 0 if successful, -1 if failed
  */
 int inode_truncate(int inumber) {
+    // simulate storage access delay (to i-node and freeinode_ts)
+    insert_delay();
     insert_delay();
 
     if (!valid_inumber(inumber) || freeinode_ts[inumber] == FREE) {
@@ -240,7 +258,26 @@ int inode_truncate(int inumber) {
     rwl_wrlock(&inode_locks[inumber]);
 
     inode_t *inode = &inode_table[inumber];
+    if (inode_delete_data_blocks(inode) < 0) {
+        rwl_unlock(&inode_locks[inumber]);
+        return -1;
+    }
 
+    rwl_unlock(&inode_locks[inumber]);
+
+    return 0;
+}
+
+/* TODO does this make sense? we don't want to repeat code, but we can't lock
+ * twice on inode_delete*/
+/*
+ * Deletes all allocated blocks in i-node, but it's NOT thread safe.
+ * Meant to be used as an auxilary function.
+ * Input:
+ *  - inumber: i-node's number
+ * Returns: 0 if successful, -1 if failed
+ */
+int inode_delete_data_blocks(inode_t *inode) {
     // TODO what happens if we an error occurs while deleting the inode?
     size_t remaining_size = inode->i_size;
     int current_block_i = (int)(remaining_size / BLOCK_SIZE);
@@ -258,8 +295,6 @@ int inode_truncate(int inumber) {
         remaining_size -= BLOCK_SIZE;
     }
     inode->i_size = 0;
-
-    rwl_unlock(&inode_locks[inumber]);
 
     return 0;
 }
