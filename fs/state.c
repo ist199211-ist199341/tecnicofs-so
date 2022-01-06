@@ -15,6 +15,7 @@
 static inode_t inode_table[INODE_TABLE_SIZE];
 static pthread_rwlock_t inode_locks[INODE_TABLE_SIZE];
 static char freeinode_ts[INODE_TABLE_SIZE];
+static pthread_rwlock_t freeinode_ts_rwl;
 
 /* Data blocks */
 static char fs_data[BLOCK_SIZE * DATA_BLOCKS];
@@ -76,6 +77,10 @@ void state_init() {
             exit(EXIT_FAILURE);
         }
     }
+    if (pthread_rwlock_init(&freeinode_ts_rwl, NULL) != 0) {
+        perror("Failed to init RWlock");
+        exit(EXIT_FAILURE);
+    };
 
     for (size_t i = 0; i < DATA_BLOCKS; i++) {
         free_blocks[i] = FREE;
@@ -98,6 +103,11 @@ void state_destroy() {
         }
     }
 
+    if (pthread_rwlock_destroy(&freeinode_ts_rwl) != 0) {
+        perror("Failed to destroy RWlock");
+        exit(EXIT_FAILURE);
+    }
+
     if (pthread_rwlock_destroy(&free_blocks_rwl) != 0) {
         perror("Failed to destroy RWlock");
         exit(EXIT_FAILURE);
@@ -112,6 +122,10 @@ void state_destroy() {
  *  new i-node's number if successfully created, -1 otherwise
  */
 int inode_create(inode_type n_type) {
+    if (pthread_rwlock_rdlock(&freeinode_ts_rwl) != 0) {
+        perror("Failed to lock RWLock");
+        exit(EXIT_FAILURE);
+    }
     for (int inumber = 0; inumber < INODE_TABLE_SIZE; inumber++) {
         if ((inumber * (int)sizeof(allocation_state_t) % BLOCK_SIZE) == 0) {
             insert_delay(); // simulate storage access delay (to freeinode_ts)
@@ -119,6 +133,27 @@ int inode_create(inode_type n_type) {
 
         /* Finds first free entry in i-node table */
         if (freeinode_ts[inumber] == FREE) {
+            if (pthread_rwlock_unlock(&freeinode_ts_rwl) != 0) {
+                perror("Failed to unlock RWLock");
+                exit(EXIT_FAILURE);
+            }
+            if (pthread_rwlock_wrlock(&freeinode_ts_rwl) != 0) {
+                perror("Failed to lock RWLocka");
+                exit(EXIT_FAILURE);
+            }
+            // Recheck inode status because it might have been changed by
+            // another thread
+            if (freeinode_ts[inumber] != FREE) {
+                if (pthread_rwlock_unlock(&freeinode_ts_rwl) != 0) {
+                    perror("Failed to unlock RWLock");
+                    exit(EXIT_FAILURE);
+                }
+                if (pthread_rwlock_rdlock(&freeinode_ts_rwl) != 0) {
+                    perror("Failed to lock RWLock");
+                    exit(EXIT_FAILURE);
+                }
+                continue;
+            }
             /* Found a free entry, so takes it for the new i-node*/
             freeinode_ts[inumber] = TAKEN;
             insert_delay(); // simulate storage access delay (to i-node)
@@ -130,6 +165,10 @@ int inode_create(inode_type n_type) {
                 int indirect_block_number = data_block_alloc();
                 if (indirect_block_number == -1) {
                     freeinode_ts[inumber] = FREE;
+                    if (pthread_rwlock_unlock(&freeinode_ts_rwl) != 0) {
+                        perror("Failed to unlock RWLock");
+                        exit(EXIT_FAILURE);
+                    }
                     return -1;
                 }
 
@@ -146,6 +185,10 @@ int inode_create(inode_type n_type) {
                     (dir_entry_t *)data_block_get(indirect_block_number);
                 if (dir_entry == NULL) {
                     freeinode_ts[inumber] = FREE;
+                    if (pthread_rwlock_unlock(&freeinode_ts_rwl) != 0) {
+                        perror("Failed to unlock RWLock");
+                        exit(EXIT_FAILURE);
+                    }
                     return -1;
                 }
 
@@ -162,8 +205,16 @@ int inode_create(inode_type n_type) {
                 inode_table[inumber].i_indirect_block = -1;
             }
 
+            if (pthread_rwlock_unlock(&freeinode_ts_rwl) != 0) {
+                perror("Failed to unlock RWLock");
+                exit(EXIT_FAILURE);
+            }
             return inumber;
         }
+    }
+    if (pthread_rwlock_unlock(&freeinode_ts_rwl) != 0) {
+        perror("Failed to unlock RWLock");
+        exit(EXIT_FAILURE);
     }
     return -1;
 }
@@ -416,6 +467,17 @@ int data_block_alloc() {
                     exit(EXIT_FAILURE);
                 }
                 return i;
+            } else {
+                // another thread got the block first, let go of the write lock
+                // and change to the read lock again
+                if (pthread_rwlock_unlock(&free_blocks_rwl) != 0) {
+                    perror("Failed to unlock RWLock");
+                    exit(EXIT_FAILURE);
+                }
+                if (pthread_rwlock_rdlock(&free_blocks_rwl) != 0) {
+                    perror("Failed to lock RWLock");
+                    exit(EXIT_FAILURE);
+                }
             }
         }
     }

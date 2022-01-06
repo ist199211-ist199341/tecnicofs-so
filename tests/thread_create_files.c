@@ -10,25 +10,44 @@
 #include <unistd.h>
 
 #define FILE_NAME_MAX_LEN 10
-#define FILES_TO_CREATE 23
+#define THREAD_COUNT 2
+#define FILES_TO_CREATE_PER_THREAD 10
 
 void *create_file(void *arg);
 
 int main() {
-
-    pthread_t tid[FILES_TO_CREATE];
+    pthread_t tid[THREAD_COUNT];
     assert(tfs_init() != -1);
+    int table[THREAD_COUNT];
 
-    for (int i = 0; i < FILES_TO_CREATE; ++i) {
-        int *file_i = malloc(sizeof(int));
-        *file_i = i + 1;
-        if (pthread_create(&tid[i], NULL, create_file, file_i) != 0) {
+    for (int i = 0; i < THREAD_COUNT; ++i) {
+        table[i] = i * FILES_TO_CREATE_PER_THREAD + 1;
+    }
+
+    for (int i = 0; i < THREAD_COUNT; ++i) {
+        if (pthread_create(&tid[i], NULL, create_file, &table[i]) != 0) {
             exit(EXIT_FAILURE);
         }
     }
 
-    for (int i = 0; i < FILES_TO_CREATE; ++i) {
+    for (int i = 0; i < THREAD_COUNT; ++i) {
         pthread_join(tid[i], NULL);
+    }
+
+    // Check if files have the correct content
+    for (int i = 0; i < THREAD_COUNT * FILES_TO_CREATE_PER_THREAD; ++i) {
+        char path[FILE_NAME_MAX_LEN] = {'/'};
+        sprintf(path + 1, "%d", i + 1);
+
+        int f = tfs_open(path, 0);
+        assert(f != -1);
+
+        char buffer[FILE_NAME_MAX_LEN];
+        assert(tfs_read(f, buffer, FILE_NAME_MAX_LEN) != -1);
+
+        assert(strcmp(path, buffer) == 0);
+
+        assert(tfs_close(f) != -1);
     }
 
     tfs_destroy();
@@ -39,22 +58,19 @@ int main() {
 
 void *create_file(void *arg) {
     int file_i = *((int *)arg);
-    free(arg);
-    sleep(1);
 
-    char path[FILE_NAME_MAX_LEN] = {'/'};
-    sprintf(path + 1, "%d", file_i);
+    for (int i = 0; i < FILES_TO_CREATE_PER_THREAD; i++) {
+        char path[FILE_NAME_MAX_LEN] = {'/'};
+        sprintf(path + 1, "%d", file_i + i);
 
-    printf("%s\n", path);
+        int f = tfs_open(path, TFS_O_CREAT);
+        assert(f != -1);
 
-    int f = tfs_open(path, TFS_O_CREAT);
-    assert(f != -1);
+        // write the file name to the file, so we can test if two files got the
+        // same inode
+        assert(tfs_write(f, path, strlen(path) + 1) == strlen(path) + 1);
 
-    printf("f = %d\n", f);
-
-    tfs_close(f);
-
-    printf("%d closed\n", file_i);
-
+        assert(tfs_close(f) != -1);
+    }
     return NULL;
 }
