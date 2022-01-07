@@ -16,7 +16,7 @@ Below is a description of what each test does.
 ## Student Made Tests
 
 - `thread_create_files`: Create as many file as possible, in order to test concurrency of `inode_create`.
-- `thread_read_10`
+- `thread_read_same_file`: Fill a file with large content and read from it on multiple threads at the same time.
 - `thread_trunc_append`
 - `thread_write_new_files`: Create various files in different thread with different content,
   ensuring there is spill while writing, and then compares with the original content on the main thread.
