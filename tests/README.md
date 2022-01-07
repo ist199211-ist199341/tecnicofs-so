@@ -18,7 +18,8 @@ Below is a description of what each test does.
 - `thread_create_files`: Create as many file as possible, in order to test concurrency of `inode_create`.
 - `thread_read_10`
 - `thread_trunc_append`
-- `thread_write_new_files`
+- `thread_write_new_files`: Create various files in different thread with different content,
+  ensuring there is spill while writing, and then compares with the original content on the main thread.
 - `thread_write_read`
 - `thread_big_file`
 - `write_more_than_10_blocks_simple`: Fill a file over 10 blocks, but writes may write to more than one block at a time.
