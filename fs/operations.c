@@ -152,7 +152,8 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
         }
 
         /* Perform the actual write */
-        memcpy(block + (file->of_offset % BLOCK_SIZE), buffer, to_write_block);
+        memcpy(block + (file->of_offset % BLOCK_SIZE),
+               buffer + sizeof(char) * (written - to_write), to_write_block);
 
         /* The offset associated with the file handle is
          * incremented accordingly */
@@ -208,7 +209,8 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
         }
 
         /* Perform the actual read */
-        memcpy(buffer, block + (file->of_offset % BLOCK_SIZE), to_read_block);
+        memcpy(buffer + sizeof(char) * (read - to_read),
+               block + (file->of_offset % BLOCK_SIZE), to_read_block);
 
         /* The offset associated with the file handle is
          * incremented accordingly */
