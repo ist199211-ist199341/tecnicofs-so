@@ -53,7 +53,7 @@ void write_fn() {
     size_t bytes_read = fread(buffer, sizeof(char), BUFFER_LEN, fd);
 
     while (bytes_read > 0) {
-        /* read the contents of the file */
+        /* write the contents of the file */
         r = tfs_write(f, buffer, bytes_read);
         assert(r == bytes_read);
         bytes_read = fread(buffer, sizeof(char), BUFFER_LEN, fd);
