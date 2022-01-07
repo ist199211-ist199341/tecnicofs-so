@@ -251,7 +251,13 @@ int inode_truncate(int inumber) {
     insert_delay();
     insert_delay();
 
-    if (!valid_inumber(inumber) || freeinode_ts[inumber] == FREE) {
+    if (!valid_inumber(inumber)) {
+        return -1;
+    }
+
+    rwl_rdlock(&freeinode_ts_rwl);
+    if (freeinode_ts[inumber] == FREE) {
+        rwl_unlock(&freeinode_ts_rwl);
         return -1;
     }
 
@@ -260,10 +266,12 @@ int inode_truncate(int inumber) {
     inode_t *inode = &inode_table[inumber];
     if (inode_delete_data_blocks(inode) < 0) {
         rwl_unlock(&inode_locks[inumber]);
+        rwl_unlock(&freeinode_ts_rwl);
         return -1;
     }
 
     rwl_unlock(&inode_locks[inumber]);
+    rwl_unlock(&freeinode_ts_rwl);
 
     return 0;
 }
@@ -372,7 +380,7 @@ int find_in_dir(int inumber, char const *sub_name) {
     insert_delay(); // simulate storage access delay to i-node with inumber
     // TODO should we check if inode is not free (like on inode_delete for
     // example)?
-    if (!valid_inumber(inumber) ||
+    if (!valid_inumber(inumber) || freeinode_ts[inumber] == FREE ||
         inode_table[inumber].i_node_type != T_DIRECTORY) {
         return -1;
     }
