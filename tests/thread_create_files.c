@@ -15,6 +15,8 @@
 
 void *create_file(void *arg);
 
+/* This test creates as many files as possible concurrently in order to test if
+ * inumbers are assigned correctly. */
 int main() {
     pthread_t tid[THREAD_COUNT];
     assert(tfs_init() != -1);

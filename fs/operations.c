@@ -234,6 +234,7 @@ int tfs_copy_to_external_fs(char const *source_path, char const *dest_path) {
     /* flag "w" - crates empty file, if it exists it clears the content :) */
     FILE *dest_file = fopen(dest_path, "w");
     if (dest_file == NULL) {
+        tfs_close(source_file); // ignore result since we return -1 anyway
         return -1;
     }
 
@@ -244,6 +245,15 @@ int tfs_copy_to_external_fs(char const *source_path, char const *dest_path) {
     while ((read = tfs_read(source_file, buffer, BLOCK_SIZE)) > 0) {
         fwrite(buffer, sizeof(char), (size_t)read, dest_file);
     }
-    fclose(dest_file);
+    if (fclose(dest_file) != 0) {
+        tfs_close(source_file); // ignore result since we return -1 anyway
+        return -1;
+    }
+    if (tfs_close(source_file) != 0) {
+        return -1;
+    }
+    if (read < 0) {
+        return -1;
+    }
     return 0;
 }

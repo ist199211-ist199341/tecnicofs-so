@@ -19,7 +19,7 @@ void *read_fn(void *ignore);
 
 /* This test fills a file with large content, and then attempts to read from it
  * simultaneously in multiple threads, comparing the content with the original
- * source.*/
+ * source. */
 int main() {
     assert(tfs_init() != -1);
 

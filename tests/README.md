@@ -15,14 +15,13 @@ Below is a description of what each test does.
 
 ## Student Made Tests
 
+- `thread_copy_to_external`: Copy various files multiple times concurrently to the external FS,
+  and compare their contents with the original.
 - `thread_create_files`: Create as many file as possible, in order to test concurrency of `inode_create`.
 - `thread_read_same_file`: Fill a file with large content and read from it on multiple threads at the same time.
 - `thread_trunc_append`: Write to new files concurrently, and then append and/or truncate them
   concurrently as well, verifying the end result.
 - `thread_write_new_files`: Create various files in different thread with different content,
   ensuring there is spill while writing, and then compares with the original content on the main thread.
-- `thread_big_file`
+- `write_big_file`
 - `write_more_than_10_blocks_simple`: Fill a file over 10 blocks, but writes may write to more than one block at a time.
-
-Idea:
-copy to external with multithreading

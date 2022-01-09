@@ -32,7 +32,7 @@ void check_if_file_was_correctly_written(char *input_file, char *tfs_file);
 int main() {
     assert(tfs_init() != -1);
 
-    pthread_t tid[4];
+    pthread_t tid[FILE_COUNT];
     int file_id[FILE_COUNT];
 
     for (int i = 0; i < FILE_COUNT; ++i) {
