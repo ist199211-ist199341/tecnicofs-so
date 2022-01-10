@@ -51,6 +51,9 @@ int inode_truncate(int inumber);
 int inode_delete_data_blocks(inode_t *inode);
 inode_t *inode_get(int inumber);
 
+ssize_t inode_write(int fhandle, void const *buffer, size_t to_write);
+ssize_t inode_read(int fhandle, void *buffer, size_t len);
+
 int clear_dir_entry(int inumber, int sub_inumber);
 int add_dir_entry(int inumber, int sub_inumber, char const *sub_name);
 int find_in_dir(int inumber, char const *sub_name);
