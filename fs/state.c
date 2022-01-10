@@ -646,7 +646,7 @@ int remove_from_open_file_table(int fhandle) {
 /* Returns pointer to a given entry in the open file table
  * Inputs:
  * 	 - file handle
- * Returns: pointer to the entry if sucessful, NULL otherwise
+ * Returns: pointer to the entry if successful, NULL otherwise
  */
 open_file_entry_t *get_open_file_entry(int fhandle) {
     if (!valid_file_handle(fhandle)) {
@@ -658,7 +658,7 @@ open_file_entry_t *get_open_file_entry(int fhandle) {
  * Inputs:
  *   - inode: pointer to the inode
  *   - index: the index of the i_data_block to get
- * Returns: Returns the index of the data block if sucessful, or -1 otherwise
+ * Returns: Returns the index of the data block if successful, or -1 otherwise
  */
 int inode_get_block_number_at_index(inode_t *inode, int index) {
     if (index < 0 || index >= INODE_BLOCK_COUNT) {

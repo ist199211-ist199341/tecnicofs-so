@@ -72,7 +72,7 @@ void *truncate_or_append(void *input) {
 
     char buffer[BUFFER_LEN];
     // A for append (mode = 0), T for truncate (mode = 1)
-    char letter = 'A' + (char)(mode[file_id] * ('T' - 'A'));
+    int letter = 'A' + (char)(mode[file_id]) * ('T' - 'A');
 
     memset(buffer, letter, BUFFER_LEN);
 

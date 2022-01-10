@@ -14,7 +14,7 @@ INCLUDES = $(addprefix -I, $(INCLUDE_DIRS))
 SOURCES  := $(wildcard */*.c)
 HEADERS  := $(wildcard */*.h)
 OBJECTS  := $(SOURCES:.c=.o)
-TARGET_EXECS := tests/test1 tests/copy_to_external_simple tests/copy_to_external_errors tests/write_10_blocks_spill tests/write_10_blocks_simple tests/write_more_than_10_blocks_simple tests/write_more_than_10_blocks_spill tests/write_big_file tests/thread_write_new_files tests/thread_trunc_append tests/thread_read_same_file tests/thread_create_files tests/thread_copy_to_external
+TARGET_EXECS := tests/test1 tests/copy_to_external_simple tests/copy_to_external_errors tests/write_10_blocks_spill tests/write_10_blocks_simple tests/write_more_than_10_blocks_simple tests/write_more_than_10_blocks_spill tests/thread_write_new_files tests/thread_trunc_append tests/thread_read_same_file tests/thread_create_files tests/thread_copy_to_external
 
 # VPATH is a variable used by Makefile which finds *sources* and makes them available throughout the codebase
 # vpath %.h <DIR> tells make to look for header files in <DIR>
@@ -48,7 +48,7 @@ endif
 
 # A phony target is one that is not really the name of a file
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
-.PHONY: all clean depend fmt
+.PHONY: all clean depend fmt test
 
 all: $(TARGET_EXECS)
 
@@ -91,3 +91,6 @@ clean:
 # Run `make depend` whenever you add new includes in your files
 depend : $(SOURCES)
 	$(CC) $(INCLUDES) -MM $^ > autodep
+
+test: $(TARGET_EXECS)
+	for x in `echo "$(TARGET_EXECS)" | sed "s/ /\n/g" | sed "s/^tests\///g"`; do (cd tests && ./$$x); done

@@ -1,0 +1,11 @@
+name: CI
+on: push
+
+jobs:
+  compile-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v2
+      - name: Compile and Test
+        run: make test
