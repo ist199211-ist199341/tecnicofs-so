@@ -2,3 +2,4 @@
 !*.c
 !.gitignore
 !*.md
+!input*.txt

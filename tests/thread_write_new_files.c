@@ -14,10 +14,10 @@
 #define FILE_COUNT 4
 
 char *input_files[] = {
-    "shrek1.txt",
-    "shrek2.txt",
-    "shrek3.txt",
-    "shrek4.txt",
+    "input1.txt",
+    "input2.txt",
+    "input3.txt",
+    "input4.txt",
 };
 char *tfs_files[] = {"/f1", "/f2", "/f3", "/f4"};
 

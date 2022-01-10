@@ -14,8 +14,8 @@
 #define REPEAT_COUNT 15
 #define FILL_COUNT (BUFFER_LEN * REPEAT_COUNT)
 
-char *input_files[] = {"shrek1.txt", "shrek1.txt", "shrek2.txt", "shrek2.txt",
-                       "shrek3.txt", "shrek3.txt", "shrek4.txt", "shrek4.txt"};
+char *input_files[] = {"input1.txt", "input1.txt", "input2.txt", "input2.txt",
+                       "input3.txt", "input3.txt", "input4.txt", "input4.txt"};
 int mode[] = {0, 1, 0, 1, 0, 1, 0, 1, 0, 1}; // 0 = append, 1 = truncate
 char *tfs_files[] = {"/f1", "/f2", "/f3", "/f4", "/f5", "/f6", "/f7", "/f8"};
 

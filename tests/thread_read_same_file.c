@@ -11,7 +11,7 @@
 
 #define BUFFER_LEN 120
 #define THREAD_NUM 20
-#define INPUT_FILE "shrek1.txt"
+#define INPUT_FILE "input1.txt"
 #define TFS_FILE "/f1"
 
 void write_fn();
