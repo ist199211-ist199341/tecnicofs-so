@@ -26,7 +26,7 @@ static pthread_rwlock_t free_blocks_rwl;
 
 static open_file_entry_t open_file_table[MAX_OPEN_FILES];
 static char free_open_file_entries[MAX_OPEN_FILES];
-static pthread_rwlock_t open_file_table_rwl;
+static pthread_mutex_t free_open_file_entries_mutex;
 
 static inline bool valid_inumber(int inumber) {
     return inumber >= 0 && inumber < INODE_TABLE_SIZE;
@@ -92,10 +92,14 @@ void state_init() {
     };
 
     for (size_t i = 0; i < MAX_OPEN_FILES; i++) {
+        if (pthread_mutex_init(&open_file_table[i].lock, NULL) != 0) {
+            perror("Failed to init Mutex");
+            exit(EXIT_FAILURE);
+        }
         free_open_file_entries[i] = FREE;
     }
-    if (pthread_rwlock_init(&open_file_table_rwl, NULL) != 0) {
-        perror("Failed to init RWlock");
+    if (pthread_mutex_init(&free_open_file_entries_mutex, NULL) != 0) {
+        perror("Failed to init Mutex");
         exit(EXIT_FAILURE);
     };
 }
@@ -118,8 +122,15 @@ void state_destroy() {
         exit(EXIT_FAILURE);
     }
 
-    if (pthread_rwlock_destroy(&open_file_table_rwl) != 0) {
-        perror("Failed to destroy RWlock");
+    for (size_t i = 0; i < MAX_OPEN_FILES; i++) {
+        if (pthread_mutex_destroy(&open_file_table[i].lock) != 0) {
+            perror("Failed to destroy Mutex");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    if (pthread_mutex_destroy(&free_open_file_entries_mutex) != 0) {
+        perror("Failed to destroy Mutex");
         exit(EXIT_FAILURE);
     }
 }
@@ -327,12 +338,14 @@ ssize_t inode_write(int fhandle, void const *buffer, size_t to_write) {
     if (file == NULL) {
         return -1;
     }
+    mutex_lock(&file->lock);
 
     /* From the open file table entry, we get the inode */
     int inumber = file->of_inumber;
 
     inode_t *inode = inode_get(inumber);
     if (inode == NULL) {
+        mutex_unlock(&file->lock);
         return -1;
     }
     /* Determine how many bytes to write */
@@ -360,11 +373,13 @@ ssize_t inode_write(int fhandle, void const *buffer, size_t to_write) {
             if (new_block < 0) {
                 /* If it gets an error to alloc block */
                 rwl_unlock(&inode_locks[inumber]);
+                mutex_unlock(&file->lock);
                 return -1;
             }
             if (inode_set_block_number_at_index(inode, current_block_i,
                                                 new_block) < 0) {
                 rwl_unlock(&inode_locks[inumber]);
+                mutex_unlock(&file->lock);
                 return -1;
             }
         }
@@ -373,6 +388,7 @@ ssize_t inode_write(int fhandle, void const *buffer, size_t to_write) {
             inode_get_block_number_at_index(inode, current_block_i));
         if (block == NULL) {
             rwl_unlock(&inode_locks[inumber]);
+            mutex_unlock(&file->lock);
             return -1;
         }
 
@@ -391,6 +407,7 @@ ssize_t inode_write(int fhandle, void const *buffer, size_t to_write) {
         to_write -= to_write_block;
     }
     rwl_unlock(&inode_locks[inumber]);
+    mutex_unlock(&file->lock);
     return (ssize_t)written;
 }
 ssize_t inode_read(int fhandle, void *buffer, size_t len) {
@@ -398,11 +415,13 @@ ssize_t inode_read(int fhandle, void *buffer, size_t len) {
     if (file == NULL) {
         return -1;
     }
+    mutex_lock(&file->lock);
 
     /* From the open file table entry, we get the inode */
     int inumber = file->of_inumber;
     inode_t *inode = inode_get(inumber);
     if (inode == NULL) {
+        mutex_unlock(&file->lock);
         return -1;
     }
     rwl_rdlock(&inode_locks[inumber]);
@@ -428,6 +447,7 @@ ssize_t inode_read(int fhandle, void *buffer, size_t len) {
             inode_get_block_number_at_index(inode, current_block_i));
         if (block == NULL) {
             rwl_unlock(&inode_locks[inumber]);
+            mutex_unlock(&file->lock);
             return -1;
         }
 
@@ -443,6 +463,7 @@ ssize_t inode_read(int fhandle, void *buffer, size_t len) {
         to_read -= to_read_block;
     }
     rwl_unlock(&inode_locks[inumber]);
+    mutex_unlock(&file->lock);
     return (ssize_t)read;
 }
 
@@ -603,26 +624,19 @@ void *data_block_get(int block_number) {
  * Returns: file handle if successful, -1 otherwise
  */
 int add_to_open_file_table(int inumber, size_t offset) {
-    rwl_rdlock(&open_file_table_rwl);
+    mutex_lock(&free_open_file_entries_mutex);
     for (int i = 0; i < MAX_OPEN_FILES; i++) {
         if (free_open_file_entries[i] == FREE) {
-            rwl_unlock(&open_file_table_rwl);
-            rwl_wrlock(&open_file_table_rwl);
-            if (free_open_file_entries[i] != FREE) {
-                // another thread might have gotten here while we changed the
-                // locks, therefore we need to let go and check next entry
-                rwl_unlock(&open_file_table_rwl);
-                rwl_rdlock(&open_file_table_rwl);
-                continue;
-            }
             free_open_file_entries[i] = TAKEN;
+            mutex_lock(&open_file_table[i].lock);
             open_file_table[i].of_inumber = inumber;
             open_file_table[i].of_offset = offset;
-            rwl_unlock(&open_file_table_rwl);
+            mutex_unlock(&open_file_table[i].lock);
+            mutex_unlock(&free_open_file_entries_mutex);
             return i;
         }
     }
-    rwl_unlock(&open_file_table_rwl);
+    mutex_unlock(&free_open_file_entries_mutex);
     return -1;
 }
 
@@ -632,14 +646,14 @@ int add_to_open_file_table(int inumber, size_t offset) {
  * Returns 0 is success, -1 otherwise
  */
 int remove_from_open_file_table(int fhandle) {
-    rwl_wrlock(&open_file_table_rwl);
+    mutex_lock(&free_open_file_entries_mutex);
     if (!valid_file_handle(fhandle) ||
         free_open_file_entries[fhandle] != TAKEN) {
-        rwl_unlock(&open_file_table_rwl);
+        mutex_unlock(&free_open_file_entries_mutex);
         return -1;
     }
     free_open_file_entries[fhandle] = FREE;
-    rwl_unlock(&open_file_table_rwl);
+    mutex_unlock(&free_open_file_entries_mutex);
     return 0;
 }
 
@@ -728,6 +742,20 @@ void rwl_rdlock(pthread_rwlock_t *rwl) {
 void rwl_unlock(pthread_rwlock_t *rwl) {
     if (pthread_rwlock_unlock(rwl) != 0) {
         perror("Failed to unlock RWlock");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void mutex_lock(pthread_mutex_t *mutex) {
+    if (pthread_mutex_lock(mutex) != 0) {
+        perror("Failed to lock Mutex");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void mutex_unlock(pthread_mutex_t *mutex) {
+    if (pthread_mutex_unlock(mutex) != 0) {
+        perror("Failed to unlock Mutex");
         exit(EXIT_FAILURE);
     }
 }
