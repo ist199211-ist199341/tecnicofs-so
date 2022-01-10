@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
+#include <threads.h>
+#include <unistd.h>
 
 /*
  * Directory entry
@@ -45,7 +47,12 @@ void state_destroy();
 
 int inode_create(inode_type n_type);
 int inode_delete(int inumber);
+int inode_truncate(int inumber);
+int inode_delete_data_blocks(inode_t *inode);
 inode_t *inode_get(int inumber);
+
+ssize_t inode_write(int fhandle, void const *buffer, size_t to_write);
+ssize_t inode_read(int fhandle, void *buffer, size_t len);
 
 int clear_dir_entry(int inumber, int sub_inumber);
 int add_dir_entry(int inumber, int sub_inumber, char const *sub_name);
@@ -62,5 +69,9 @@ open_file_entry_t *get_open_file_entry(int fhandle);
 int inode_get_block_number_at_index(inode_t *inode, int index);
 int inode_set_block_number_at_index(inode_t *inode, int index,
                                     int i_block_number);
+
+void rwl_wrlock(pthread_rwlock_t *rwl);
+void rwl_rdlock(pthread_rwlock_t *rwl);
+void rwl_unlock(pthread_rwlock_t *rwl);
 
 #endif // STATE_H

@@ -1,8 +1,10 @@
 #include "operations.h"
+#include <pthread.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 int tfs_init() {
     state_init();
@@ -55,25 +57,9 @@ int tfs_open(char const *name, int flags) {
 
         /* Truncate (if requested) */
         if (flags & TFS_O_TRUNC) {
-            if (inode->i_size > 0) {
-                size_t remaining_size = inode->i_size;
-                // TODO should be int, but needs casting
-                size_t current_block_i = remaining_size / BLOCK_SIZE;
-                while (remaining_size > 0) {
-                    int i_data_block = inode_get_block_number_at_index(
-                        inode, (int)current_block_i);
-                    if (i_data_block == -1) {
-                        return -1;
-                    }
-                    if (data_block_free(i_data_block) == -1) {
-                        return -1;
-                    }
 
-                    --current_block_i;
-                    remaining_size -= BLOCK_SIZE;
-                }
-                // TODO  Wrong value
-                inode->i_size = 0;
+            if (inode->i_size > 0) {
+                inode_truncate(inum);
             }
         }
         /* Determine initial offset */
@@ -111,121 +97,14 @@ int tfs_open(char const *name, int flags) {
 int tfs_close(int fhandle) { return remove_from_open_file_table(fhandle); }
 
 ssize_t tfs_write(int fhandle, void const *buffer, size_t to_write) {
-    open_file_entry_t *file = get_open_file_entry(fhandle);
-    if (file == NULL) {
-        return -1;
-    }
-
-    /* From the open file table entry, we get the inode */
-    inode_t *inode = inode_get(file->of_inumber);
-    if (inode == NULL) {
-        return -1;
-    }
-
-    /* Determine how many bytes to write */
-    if (to_write + file->of_offset > BLOCK_SIZE * INODE_BLOCK_COUNT) {
-        to_write = BLOCK_SIZE * INODE_BLOCK_COUNT - file->of_offset;
-    }
-
-    // TODO should be int, but needs casting
-    size_t current_block_i = file->of_offset / BLOCK_SIZE;
-    size_t written = to_write;
-
-    while (to_write > 0) {
-        size_t to_write_block = BLOCK_SIZE - (file->of_offset % BLOCK_SIZE);
-        /* if remaining to_write does not fill the whole block */
-        if (to_write_block > to_write) {
-            to_write_block = to_write;
-        }
-
-        /* If empty file, allocate new block */
-        if (inode->i_size <= current_block_i * BLOCK_SIZE) {
-
-            int new_block = data_block_alloc();
-            if (new_block < 0) {
-                /* If it gets an error to alloc block */
-                return -1;
-            }
-            if (inode_set_block_number_at_index(inode, (int)current_block_i,
-                                                new_block) < 0) {
-                return -1;
-            }
-        }
-        /* Get block to write to */
-        void *block = data_block_get(
-            inode_get_block_number_at_index(inode, (int)current_block_i));
-        if (block == NULL) {
-            return -1;
-        }
-
-        /* Perform the actual write */
-        memcpy(block + file->of_offset, buffer, to_write_block);
-
-        /* The offset associated with the file handle is
-         * incremented accordingly */
-        file->of_offset += to_write_block;
-        if (file->of_offset > inode->i_size) {
-            inode->i_size = file->of_offset;
-        }
-
-        ++current_block_i;
-        to_write -= to_write_block;
-    }
-
-    return (ssize_t)written;
+    return inode_write(fhandle, buffer, to_write);
 }
 
 ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
-    open_file_entry_t *file = get_open_file_entry(fhandle);
-    if (file == NULL) {
-        return -1;
-    }
-
-    /* From the open file table entry, we get the inode */
-    inode_t *inode = inode_get(file->of_inumber);
-    if (inode == NULL) {
-        return -1;
-    }
-
-    /* Determine how many bytes to read */
-    size_t to_read = inode->i_size - file->of_offset;
-    if (to_read > len) {
-        to_read = len;
-    }
-
-    // TODO should be int, but needs casting
-    size_t current_block_i = file->of_offset / BLOCK_SIZE;
-    size_t read = to_read;
-
-    while (to_read > 0) {
-        size_t to_read_block = BLOCK_SIZE - (file->of_offset % BLOCK_SIZE);
-        /* if remaining to_read does not need the whole block */
-        if (to_read_block > to_read) {
-            to_read_block = to_read;
-        }
-
-        void *block = data_block_get(
-            inode_get_block_number_at_index(inode, (int)current_block_i));
-        if (block == NULL) {
-            return -1;
-        }
-
-        /* Perform the actual read */
-        memcpy(buffer, block + file->of_offset, to_read_block);
-
-        /* The offset associated with the file handle is
-         * incremented accordingly */
-        file->of_offset += to_read_block;
-
-        ++current_block_i;
-        to_read -= to_read_block;
-    }
-
-    return (ssize_t)read;
+    return inode_read(fhandle, buffer, len);
 }
 
 int tfs_copy_to_external_fs(char const *source_path, char const *dest_path) {
-
     // open at the start of the file
     int source_file = tfs_open(source_path, 0);
     /* if file doesn't exist */
@@ -235,6 +114,7 @@ int tfs_copy_to_external_fs(char const *source_path, char const *dest_path) {
     /* flag "w" - crates empty file, if it exists it clears the content :) */
     FILE *dest_file = fopen(dest_path, "w");
     if (dest_file == NULL) {
+        tfs_close(source_file); // ignore result since we return -1 anyway
         return -1;
     }
 
@@ -242,9 +122,18 @@ int tfs_copy_to_external_fs(char const *source_path, char const *dest_path) {
 
     ssize_t read;
 
-    while ((read = tfs_read(source_file, buffer, BLOCK_SIZE)) > 0)
+    while ((read = tfs_read(source_file, buffer, BLOCK_SIZE)) > 0) {
         fwrite(buffer, sizeof(char), (size_t)read, dest_file);
-
-    fclose(dest_file);
+    }
+    if (fclose(dest_file) != 0) {
+        tfs_close(source_file); // ignore result since we return -1 anyway
+        return -1;
+    }
+    if (tfs_close(source_file) != 0) {
+        return -1;
+    }
+    if (read < 0) {
+        return -1;
+    }
     return 0;
 }
