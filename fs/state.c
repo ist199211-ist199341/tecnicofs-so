@@ -246,8 +246,6 @@ int inode_delete(int inumber) {
         rwl_unlock(&freeinode_ts_rwl);
         return -1;
     }
-    // TODO i don't think this will cause a deadlock, but maybe it'd be worth to
-    // add a trylock here instead (?)
     rwl_wrlock(&inode_locks[inumber]);
 
     freeinode_ts[inumber] = FREE;
@@ -308,7 +306,6 @@ int inode_truncate(int inumber) {
  * Returns: 0 if successful, -1 if failed
  */
 int inode_delete_data_blocks(inode_t *inode) {
-    // TODO what happens if we an error occurs while deleting the inode?
     size_t remaining_size = inode->i_size;
     int current_block_i = (int)(remaining_size / BLOCK_SIZE);
     while (current_block_i >= 0) {
