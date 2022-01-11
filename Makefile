@@ -21,7 +21,7 @@ TARGET_EXECS := tests/test1 tests/copy_to_external_simple tests/copy_to_external
 vpath # clears VPATH
 vpath %.h $(INCLUDE_DIRS)
 
-LDFLAGS += -lpthread
+LDFLAGS += -pthread
 LDFLAGS += -fsanitize=thread
 LDFLAGS += -fsanitize=undefined
 # LDFLAGS += -fsanitize=address
