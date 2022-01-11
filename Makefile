@@ -14,7 +14,7 @@ INCLUDES = $(addprefix -I, $(INCLUDE_DIRS))
 SOURCES  := $(wildcard */*.c)
 HEADERS  := $(wildcard */*.h)
 OBJECTS  := $(SOURCES:.c=.o)
-TARGET_EXECS := tests/test1 tests/copy_to_external_simple tests/copy_to_external_errors tests/write_10_blocks_spill tests/write_10_blocks_simple tests/write_more_than_10_blocks_simple tests/write_more_than_10_blocks_spill tests/thread_write_new_files tests/thread_trunc_append tests/thread_read_same_file tests/thread_create_files tests/thread_copy_to_external tests/thread_same_fd
+TARGET_EXECS := tests/test1 tests/copy_to_external_simple tests/copy_to_external_errors tests/write_10_blocks_spill tests/write_10_blocks_simple tests/write_more_than_10_blocks_simple tests/write_more_than_10_blocks_spill tests/thread_write_new_files tests/thread_trunc_append tests/thread_read_same_file tests/thread_create_files tests/thread_copy_to_external tests/thread_same_fd tests/block_destroy_simple
 
 # VPATH is a variable used by Makefile which finds *sources* and makes them available throughout the codebase
 # vpath %.h <DIR> tells make to look for header files in <DIR>
@@ -83,6 +83,7 @@ tests/thread_read_same_file: tests/thread_read_same_file.o fs/operations.o fs/st
 tests/thread_create_files: tests/thread_create_files.o fs/operations.o fs/state.o
 tests/thread_copy_to_external: tests/thread_copy_to_external.o fs/operations.o fs/state.o
 tests/thread_same_fd: tests/thread_same_fd fs/operations.o fs/state.o
+tests/block_destroy_simple: tests/block_destroy_simple fs/operations.o fs/state.o
 clean:
 	rm -f $(OBJECTS) $(TARGET_EXECS)
 

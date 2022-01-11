@@ -6,9 +6,6 @@
 #include <string.h>
 #include <unistd.h>
 
-int files_opened = 0;
-pthread_cond_t cond;
-
 int tfs_init() {
     state_init();
 
@@ -24,6 +21,11 @@ int tfs_init() {
 int tfs_destroy() {
     state_destroy();
     return 0;
+}
+
+int tfs_destroy_after_all_closed() {
+    check_files_opened();
+    return tfs_destroy();
 }
 
 static bool valid_pathname(char const *name) {
@@ -140,5 +142,3 @@ int tfs_copy_to_external_fs(char const *source_path, char const *dest_path) {
     }
     return 0;
 }
-
-int tfs_destroy_after_all_closed() { return tfs_destroy(); }

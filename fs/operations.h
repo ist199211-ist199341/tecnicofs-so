@@ -88,6 +88,4 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len);
  */
 int tfs_copy_to_external_fs(char const *source_path, char const *dest_path);
 
-int tfs_destroy_after_all_closed();
-
 #endif // OPERATIONS_H
