@@ -19,6 +19,7 @@ Below is a description of what each test does.
   and compare their contents with the original.
 - `thread_create_files`: Create as many file as possible, in order to test concurrency of `inode_create`.
 - `thread_read_same_file`: Fill a file with large content and read from it on multiple threads at the same time.
+- `thread_same_fs`: Test writing and reading to/from the same file descriptor on multiple threads concurrently.
 - `thread_trunc_append`: Write to new files concurrently, and then append and/or truncate them
   concurrently as well, verifying the end result.
 - `thread_write_new_files`: Create various files in different thread with different content,
