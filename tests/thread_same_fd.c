@@ -63,6 +63,7 @@ int main() {
         for (int j = 0; j < THREAD_COUNT; ++j) {
             global_count[j] += ((int *)count_result)[j];
         }
+        free(count_result);
     }
 
     for (int i = 0; i < THREAD_COUNT; ++i) {
