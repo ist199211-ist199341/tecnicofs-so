@@ -24,7 +24,7 @@ int tfs_destroy() {
 }
 
 int tfs_destroy_after_all_closed() {
-    check_files_opened();
+    wait_for_all_files_to_close();
     return tfs_destroy();
 }
 

@@ -11,7 +11,6 @@
 
 #define FILE_NAME_MAX_LEN 10
 #define THREAD_COUNT 19
-#define FILES_TO_CREATE_PER_THREAD 10
 
 void *create_file(void *arg);
 void *close_file(void *arg);
@@ -72,7 +71,8 @@ void *close_file(void *arg) {
         assert(tfs_destroy_after_all_closed() == 0);
 
     } else {
-        sleep(1);
+        // Used to diagnose that tfs_destroy_after_all_closed doesn't destroy
+        sleep(1); // before all files are closed
         assert(tfs_close(file_i - 1) == 0);
     }
 
