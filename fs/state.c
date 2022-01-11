@@ -287,13 +287,11 @@ int inode_truncate(int inumber) {
     return 0;
 }
 
-/* TODO does this make sense? we don't want to repeat code, but we can't lock
- * twice on inode_delete*/
 /*
  * Deletes all allocated blocks in i-node, but it's NOT thread safe.
  * Meant to be used as an auxilary function.
  * Input:
- *  - inumber: i-node's number
+ *  - inode: a pointer to the inode
  * Returns: 0 if successful, -1 if failed
  */
 int inode_delete_data_blocks(inode_t *inode) {
@@ -493,7 +491,7 @@ int add_dir_entry(int inumber, int sub_inumber, char const *sub_name) {
     rwl_wrlock(&inode_locks[inumber]);
 
     /* Locates the block containing the directory's entries */
-    // TODO directories only occupy one block at the moment
+    // Directories only occupy one block at the moment, so get the first block
     dir_entry_t *dir_entry =
         (dir_entry_t *)data_block_get(inode->i_data_blocks[0]);
     if (dir_entry == NULL) {
@@ -523,8 +521,6 @@ int add_dir_entry(int inumber, int sub_inumber, char const *sub_name) {
  */
 int find_in_dir(int inumber, char const *sub_name) {
     insert_delay(); // simulate storage access delay to i-node with inumber
-    // TODO should we check if inode is not free (like on inode_delete for
-    // example)?
     if (!valid_inumber(inumber) || freeinode_ts[inumber] == FREE ||
         inode_table[inumber].i_node_type != T_DIRECTORY) {
         return -1;
@@ -534,7 +530,7 @@ int find_in_dir(int inumber, char const *sub_name) {
     rwl_rdlock(&inode_locks[inumber]);
 
     /* Locates the block containing the directory's entries */
-    // TODO directories only occupy one block at the moment
+    // Directories only occupy one block at the moment, so get the first block
     dir_entry_t *dir_entry =
         (dir_entry_t *)data_block_get(inode->i_data_blocks[0]);
     if (dir_entry == NULL) {
