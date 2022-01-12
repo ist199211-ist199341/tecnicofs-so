@@ -450,16 +450,17 @@ ssize_t inode_read(int fhandle, void *buffer, size_t len) {
     }
     rwl_rdlock(&inode_locks[inumber]);
 
+    /* Make sure offset is not out of bounds */
+    /* For consistency with inode_write, even though is won't affect reads,
+     * the file offset is still changed */
+    if (file->of_offset > inode->i_size) {
+        file->of_offset = inode->i_size;
+    }
+
     /* Determine how many bytes to read */
     size_t to_read = inode->i_size - file->of_offset;
     if (to_read > len) {
         to_read = len;
-    } else if (to_read < 0) {
-        /* this might happen if the file is truncated */
-        to_read = 0;
-        /* for consistency with inode_write, even though is won't affect reads,
-         * the file offset is still changed */
-        file->of_offset = inode->i_size;
     }
 
     int current_block_i = (int)(file->of_offset / BLOCK_SIZE);
