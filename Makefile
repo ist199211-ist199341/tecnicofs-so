@@ -1,4 +1,4 @@
-# Makefile, v1
+# Makefile, v1.1
 # Sistemas Operativos, DEI/IST/ULisboa 2021-22
 #
 # This makefile should be run from the *root* of the project
@@ -21,9 +21,11 @@ TARGET_EXECS := tests/test1 tests/copy_to_external_simple tests/copy_to_external
 vpath # clears VPATH
 vpath %.h $(INCLUDE_DIRS)
 
+# Multi-threading flags
 LDFLAGS += -pthread
-LDFLAGS += -fsanitize=thread
-LDFLAGS += -fsanitize=undefined
+# fsanitize flags
+# LDFLAGS += -fsanitize=thread
+# LDFLAGS += -fsanitize=undefined
 # LDFLAGS += -fsanitize=address
 
 CFLAGS = -std=c11 -D_POSIX_C_SOURCE=200809L
@@ -69,6 +71,7 @@ fmt: $(SOURCES) $(HEADERS)
 # Note the lack of a rule.
 # make uses a set of default rules, one of which compiles C binaries
 # the CC, LD, CFLAGS and LDFLAGS are used in this rule
+
 tests/test1: tests/test1.o fs/operations.o fs/state.o fs/utils.o
 tests/copy_to_external_errors: tests/copy_to_external_errors.o fs/operations.o fs/state.o fs/utils.o
 tests/copy_to_external_simple: tests/copy_to_external_simple.o fs/operations.o fs/state.o fs/utils.o
@@ -81,10 +84,10 @@ tests/thread_trunc_append: tests/thread_trunc_append.o fs/operations.o fs/state.
 tests/thread_read_same_file: tests/thread_read_same_file.o fs/operations.o fs/state.o fs/utils.o
 tests/thread_create_files: tests/thread_create_files.o fs/operations.o fs/state.o fs/utils.o
 tests/thread_copy_to_external: tests/thread_copy_to_external.o fs/operations.o fs/state.o fs/utils.o
-tests/thread_same_fd: tests/thread_same_fd fs/operations.o fs/state.o fs/utils.o
+tests/thread_same_fd: tests/thread_same_fd.o fs/operations.o fs/state.o fs/utils.o
+
 clean:
 	rm -f $(OBJECTS) $(TARGET_EXECS)
-
 
 # This generates a dependency file, with some default dependencies gathered from the include tree
 # The dependencies are gathered in the file autodep. You can find an example illustrating this GCC feature, without Makefile, at this URL: https://renenyffenegger.ch/notes/development/languages/C-C-plus-plus/GCC/options/MM
@@ -92,5 +95,6 @@ clean:
 depend : $(SOURCES)
 	$(CC) $(INCLUDES) -MM $^ > autodep
 
+# Script that compiles the project and runs all the tests, should output "Successful test."
 test: $(TARGET_EXECS)
 	for x in `echo "$(TARGET_EXECS)" | sed "s/ /\n/g" | sed "s/^tests\///g"`; do (cd tests && ./$$x); done

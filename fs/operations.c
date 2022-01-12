@@ -132,7 +132,7 @@ int tfs_copy_to_external_fs(char const *source_path, char const *dest_path) {
     if (source_file == -1) {
         return -1;
     }
-    /* flag "w" - crates empty file, if it exists it clears the content :) */
+    /* flag "w" - crates empty file, if it exists it clears the content */
     FILE *dest_file = fopen(dest_path, "w");
     if (dest_file == NULL) {
         tfs_close(source_file); // ignore result since we return -1 anyway
