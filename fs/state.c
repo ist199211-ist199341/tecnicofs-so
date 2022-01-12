@@ -104,6 +104,9 @@ void state_init() {
     };
 }
 
+/*
+ * Destroys FS state
+ */
 void state_destroy() {
     for (size_t i = 0; i < INODE_TABLE_SIZE; i++) {
         if (pthread_rwlock_destroy(&inode_locks[i]) != 0) {
@@ -328,6 +331,15 @@ inode_t *inode_get(int inumber) {
     return &inode_table[inumber];
 }
 
+/*
+ * Writes to the data blocks of the i-node
+ * Input:
+ *  - fhandle: file handle (obtained from a previous call to tfs_open)
+ *  - buffer: buffer containing the contents to write
+ * 	- length of the contents (in bytes)
+ * Returns:  the number of bytes that were written (can be lower than
+ * 	'len' if the maximum file size is exceeded), or -1 in case of error
+ */
 ssize_t inode_write(int fhandle, void const *buffer, size_t to_write) {
     open_file_entry_t *file = get_open_file_entry(fhandle);
     if (file == NULL) {
@@ -405,6 +417,16 @@ ssize_t inode_write(int fhandle, void const *buffer, size_t to_write) {
     mutex_unlock(&file->lock);
     return (ssize_t)written;
 }
+
+/* Reads the data of the i-node to the buffer 
+ * Input:
+ * 	- file handle (obtained from a previous call to tfs_open)
+ * 	- destination buffer
+ * 	- length of the buffer
+ * 	Returns the number of bytes that were copied from the file to the buffer
+ * 	(can be lower than 'len' if the file size was reached), or -1 in case of
+ * error
+ */
 ssize_t inode_read(int fhandle, void *buffer, size_t len) {
     open_file_entry_t *file = get_open_file_entry(fhandle);
     if (file == NULL) {
@@ -661,11 +683,11 @@ open_file_entry_t *get_open_file_entry(int fhandle) {
     }
     return &open_file_table[fhandle];
 }
-/*
+/* Gets the block number given the index of the i-node
  * Inputs:
  *   - inode: pointer to the inode
  *   - index: the index of the i_data_block to get
- * Returns: Returns the index of the data block if successful, or -1 otherwise
+ * Returns: index of the data block if successful, or -1 otherwise
  */
 int inode_get_block_number_at_index(inode_t *inode, int index) {
     if (index < 0 || index >= INODE_BLOCK_COUNT) {
@@ -683,12 +705,12 @@ int inode_get_block_number_at_index(inode_t *inode, int index) {
     }
 }
 
-/*
+/* Sets the number of the data block at the given index
  * Inputs:
  *   - inode: pointer to the inode
  *   - index: the index of the i_data_block to set
  *   - i_block_number: the block number to set the i_data_block to
- * Returns: Returns 0 on success, -1 on failure
+ * Returns: 0 on success, -1 on failure
  */
 int inode_set_block_number_at_index(inode_t *inode, int index,
                                     int i_block_number) {
