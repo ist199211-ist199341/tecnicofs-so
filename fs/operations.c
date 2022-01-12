@@ -1,4 +1,6 @@
 #include "operations.h"
+#include "utils.h"
+
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -6,8 +8,15 @@
 #include <string.h>
 #include <unistd.h>
 
+static pthread_mutex_t tfs_open_mutex;
+
 int tfs_init() {
     state_init();
+
+    if (pthread_mutex_init(&tfs_open_mutex, NULL) != 0) {
+        perror("Failed to init Mutex");
+        exit(EXIT_FAILURE);
+    }
 
     /* create root inode */
     int root = inode_create(T_DIRECTORY);
@@ -20,6 +29,12 @@ int tfs_init() {
 
 int tfs_destroy() {
     state_destroy();
+
+    if (pthread_mutex_destroy(&tfs_open_mutex) != 0) {
+        perror("Failed to destroy Mutex");
+        exit(EXIT_FAILURE);
+    }
+
     return 0;
 }
 
@@ -47,8 +62,10 @@ int tfs_open(char const *name, int flags) {
         return -1;
     }
 
+    mutex_lock(&tfs_open_mutex);
     inum = tfs_lookup(name);
     if (inum >= 0) {
+        mutex_unlock(&tfs_open_mutex);
         /* The file already exists */
         inode_t *inode = inode_get(inum);
         if (inode == NULL) {
@@ -73,15 +90,19 @@ int tfs_open(char const *name, int flags) {
         /* Create inode */
         inum = inode_create(T_FILE);
         if (inum == -1) {
+            mutex_unlock(&tfs_open_mutex);
             return -1;
         }
         /* Add entry in the root directory */
         if (add_dir_entry(ROOT_DIR_INUM, inum, name + 1) == -1) {
+            mutex_unlock(&tfs_open_mutex);
             inode_delete(inum);
             return -1;
         }
+        mutex_unlock(&tfs_open_mutex);
         offset = 0;
     } else {
+        mutex_unlock(&tfs_open_mutex);
         return -1;
     }
 
