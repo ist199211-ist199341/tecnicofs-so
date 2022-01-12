@@ -1,4 +1,5 @@
 #include "state.h"
+#include "utils.h"
 
 #include <pthread.h>
 #include <stdbool.h>
@@ -81,7 +82,7 @@ void state_init() {
     if (pthread_rwlock_init(&freeinode_ts_rwl, NULL) != 0) {
         perror("Failed to init RWlock");
         exit(EXIT_FAILURE);
-    };
+    }
 
     for (size_t i = 0; i < DATA_BLOCKS; i++) {
         free_blocks[i] = FREE;
@@ -89,7 +90,7 @@ void state_init() {
     if (pthread_rwlock_init(&free_blocks_rwl, NULL) != 0) {
         perror("Failed to init RWlock");
         exit(EXIT_FAILURE);
-    };
+    }
 
     for (size_t i = 0; i < MAX_OPEN_FILES; i++) {
         if (pthread_mutex_init(&open_file_table[i].lock, NULL) != 0) {
@@ -101,7 +102,7 @@ void state_init() {
     if (pthread_mutex_init(&free_open_file_entries_mutex, NULL) != 0) {
         perror("Failed to init Mutex");
         exit(EXIT_FAILURE);
-    };
+    }
 }
 
 void state_destroy() {
@@ -716,39 +717,4 @@ int inode_set_block_number_at_index(inode_t *inode, int index,
         inode->i_data_blocks[index] = i_block_number;
     }
     return 0;
-}
-
-void rwl_wrlock(pthread_rwlock_t *rwl) {
-    if (pthread_rwlock_wrlock(rwl) != 0) {
-        perror("Failed to lock RWlock");
-        exit(EXIT_FAILURE);
-    }
-}
-
-void rwl_rdlock(pthread_rwlock_t *rwl) {
-    if (pthread_rwlock_rdlock(rwl) != 0) {
-        perror("Failed to lock RWlock");
-        exit(EXIT_FAILURE);
-    }
-}
-
-void rwl_unlock(pthread_rwlock_t *rwl) {
-    if (pthread_rwlock_unlock(rwl) != 0) {
-        perror("Failed to unlock RWlock");
-        exit(EXIT_FAILURE);
-    }
-}
-
-void mutex_lock(pthread_mutex_t *mutex) {
-    if (pthread_mutex_lock(mutex) != 0) {
-        perror("Failed to lock Mutex");
-        exit(EXIT_FAILURE);
-    }
-}
-
-void mutex_unlock(pthread_mutex_t *mutex) {
-    if (pthread_mutex_unlock(mutex) != 0) {
-        perror("Failed to unlock Mutex");
-        exit(EXIT_FAILURE);
-    }
 }

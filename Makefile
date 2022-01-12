@@ -69,19 +69,19 @@ fmt: $(SOURCES) $(HEADERS)
 # Note the lack of a rule.
 # make uses a set of default rules, one of which compiles C binaries
 # the CC, LD, CFLAGS and LDFLAGS are used in this rule
-tests/test1: tests/test1.o fs/operations.o fs/state.o
-tests/copy_to_external_errors: tests/copy_to_external_errors.o fs/operations.o fs/state.o
-tests/copy_to_external_simple: tests/copy_to_external_simple.o fs/operations.o fs/state.o
-tests/write_10_blocks_spill: tests/write_10_blocks_spill.o fs/operations.o fs/state.o
-tests/write_10_blocks_simple: tests/write_10_blocks_simple.o fs/operations.o fs/state.o
-tests/write_more_than_10_blocks_simple: tests/write_more_than_10_blocks_simple.o fs/operations.o fs/state.o
-tests/write_more_than_10_blocks_spill: tests/write_more_than_10_blocks_spill.o fs/operations.o fs/state.o
-tests/thread_write_new_files: tests/thread_write_new_files.o fs/operations.o fs/state.o
-tests/thread_trunc_append: tests/thread_trunc_append.o fs/operations.o fs/state.o
-tests/thread_read_same_file: tests/thread_read_same_file.o fs/operations.o fs/state.o
-tests/thread_create_files: tests/thread_create_files.o fs/operations.o fs/state.o
-tests/thread_copy_to_external: tests/thread_copy_to_external.o fs/operations.o fs/state.o
-tests/thread_same_fd: tests/thread_same_fd fs/operations.o fs/state.o
+tests/test1: tests/test1.o fs/operations.o fs/state.o fs/utils.o
+tests/copy_to_external_errors: tests/copy_to_external_errors.o fs/operations.o fs/state.o fs/utils.o
+tests/copy_to_external_simple: tests/copy_to_external_simple.o fs/operations.o fs/state.o fs/utils.o
+tests/write_10_blocks_spill: tests/write_10_blocks_spill.o fs/operations.o fs/state.o fs/utils.o
+tests/write_10_blocks_simple: tests/write_10_blocks_simple.o fs/operations.o fs/state.o fs/utils.o
+tests/write_more_than_10_blocks_simple: tests/write_more_than_10_blocks_simple.o fs/operations.o fs/state.o fs/utils.o
+tests/write_more_than_10_blocks_spill: tests/write_more_than_10_blocks_spill.o fs/operations.o fs/state.o fs/utils.o
+tests/thread_write_new_files: tests/thread_write_new_files.o fs/operations.o fs/state.o fs/utils.o
+tests/thread_trunc_append: tests/thread_trunc_append.o fs/operations.o fs/state.o fs/utils.o
+tests/thread_read_same_file: tests/thread_read_same_file.o fs/operations.o fs/state.o fs/utils.o
+tests/thread_create_files: tests/thread_create_files.o fs/operations.o fs/state.o fs/utils.o
+tests/thread_copy_to_external: tests/thread_copy_to_external.o fs/operations.o fs/state.o fs/utils.o
+tests/thread_same_fd: tests/thread_same_fd fs/operations.o fs/state.o fs/utils.o
 clean:
 	rm -f $(OBJECTS) $(TARGET_EXECS)
 
