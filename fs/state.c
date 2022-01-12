@@ -356,6 +356,13 @@ ssize_t inode_write(int fhandle, void const *buffer, size_t to_write) {
         mutex_unlock(&file->lock);
         return -1;
     }
+    rwl_wrlock(&inode_locks[inumber]);
+
+    /* Make sure offset is not out of bounds */
+    if (file->of_offset > inode->i_size) {
+        file->of_offset = inode->i_size;
+    }
+
     /* Determine how many bytes to write */
     if (to_write + file->of_offset > BLOCK_SIZE * INODE_BLOCK_COUNT) {
         to_write = BLOCK_SIZE * INODE_BLOCK_COUNT - file->of_offset;
@@ -364,7 +371,6 @@ ssize_t inode_write(int fhandle, void const *buffer, size_t to_write) {
     int current_block_i = (int)(file->of_offset / BLOCK_SIZE);
 
     size_t written = to_write;
-    rwl_wrlock(&inode_locks[inumber]);
 
     while (to_write > 0) {
 
@@ -419,7 +425,7 @@ ssize_t inode_write(int fhandle, void const *buffer, size_t to_write) {
     return (ssize_t)written;
 }
 
-/* Reads the data of the i-node to the buffer 
+/* Reads the data of the i-node to the buffer
  * Input:
  * 	- file handle (obtained from a previous call to tfs_open)
  * 	- destination buffer
@@ -448,6 +454,12 @@ ssize_t inode_read(int fhandle, void *buffer, size_t len) {
     size_t to_read = inode->i_size - file->of_offset;
     if (to_read > len) {
         to_read = len;
+    } else if (to_read < 0) {
+        /* this might happen if the file is truncated */
+        to_read = 0;
+        /* for consistency with inode_write, even though is won't affect reads,
+         * the file offset is still changed */
+        file->of_offset = inode->i_size;
     }
 
     int current_block_i = (int)(file->of_offset / BLOCK_SIZE);
