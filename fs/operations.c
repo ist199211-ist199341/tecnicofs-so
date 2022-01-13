@@ -144,7 +144,14 @@ int tfs_copy_to_external_fs(char const *source_path, char const *dest_path) {
     ssize_t read;
 
     while ((read = tfs_read(source_file, buffer, BLOCK_SIZE)) > 0) {
-        fwrite(buffer, sizeof(char), (size_t)read, dest_file);
+        // make sure the entire buffer is written
+        if (fwrite(buffer, sizeof(char), (size_t)read, dest_file) !=
+            (size_t)read * sizeof(char)) {
+            // ignore result since we return -1 anyway
+            fclose(dest_file);
+            tfs_close(source_file);
+            return -1;
+        }
     }
     if (fclose(dest_file) != 0) {
         tfs_close(source_file); // ignore result since we return -1 anyway
