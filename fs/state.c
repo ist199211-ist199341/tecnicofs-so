@@ -337,9 +337,9 @@ inode_t *inode_get(int inumber) {
  * Input:
  *  - fhandle: file handle (obtained from a previous call to tfs_open)
  *  - buffer: buffer containing the contents to write
- * 	- length of the contents (in bytes)
+ *  - length of the contents (in bytes)
  * Returns:  the number of bytes that were written (can be lower than
- * 	'len' if the maximum file size is exceeded), or -1 in case of error
+ *  'len' if the maximum file size is exceeded), or -1 in case of error
  */
 ssize_t inode_write(int fhandle, void const *buffer, size_t to_write) {
     open_file_entry_t *file = get_open_file_entry(fhandle);
@@ -427,11 +427,11 @@ ssize_t inode_write(int fhandle, void const *buffer, size_t to_write) {
 
 /* Reads the data of the i-node to the buffer
  * Input:
- * 	- file handle (obtained from a previous call to tfs_open)
- * 	- destination buffer
- * 	- length of the buffer
- * 	Returns the number of bytes that were copied from the file to the buffer
- * 	(can be lower than 'len' if the file size was reached), or -1 in case of
+ *  - file handle (obtained from a previous call to tfs_open)
+ *  - destination buffer
+ *  - length of the buffer
+ *  Returns the number of bytes that were copied from the file to the buffer
+ *  (can be lower than 'len' if the file size was reached), or -1 in case of
  * error
  */
 ssize_t inode_read(int fhandle, void *buffer, size_t len) {
@@ -548,9 +548,9 @@ int add_dir_entry(int inumber, int sub_inumber, char const *sub_name) {
 
 /* Looks for a given name inside a directory
  * Input:
- * 	- parent directory's i-node number
- * 	- name to search
- * 	Returns i-number linked to the target name, -1 if not found
+ *  - parent directory's i-node number
+ *  - name to search
+ *  Returns i-number linked to the target name, -1 if not found
  */
 int find_in_dir(int inumber, char const *sub_name) {
     insert_delay(); // simulate storage access delay to i-node with inumber
@@ -619,7 +619,7 @@ int data_block_alloc() {
 
 /* Frees a data block
  * Input
- * 	- the block index
+ *  - the block index
  * Returns: 0 if success, -1 otherwise
  */
 int data_block_free(int block_number) {
@@ -634,7 +634,7 @@ int data_block_free(int block_number) {
 
 /* Returns a pointer to the contents of a given block
  * Input:
- * 	- Block's index
+ *  - Block's index
  * Returns: pointer to the first byte of the block, NULL otherwise
  */
 void *data_block_get(int block_number) {
@@ -648,8 +648,8 @@ void *data_block_get(int block_number) {
 
 /* Add new entry to the open file table
  * Inputs:
- * 	- I-node number of the file to open
- * 	- Initial offset
+ *  - I-node number of the file to open
+ *  - Initial offset
  * Returns: file handle if successful, -1 otherwise
  */
 int add_to_open_file_table(int inumber, size_t offset) {
@@ -671,7 +671,7 @@ int add_to_open_file_table(int inumber, size_t offset) {
 
 /* Frees an entry from the open file table
  * Inputs:
- * 	- file handle to free/close
+ *  - file handle to free/close
  * Returns 0 is success, -1 otherwise
  */
 int remove_from_open_file_table(int fhandle) {
@@ -688,7 +688,7 @@ int remove_from_open_file_table(int fhandle) {
 
 /* Returns pointer to a given entry in the open file table
  * Inputs:
- * 	 - file handle
+ *   - file handle
  * Returns: pointer to the entry if successful, NULL otherwise
  */
 open_file_entry_t *get_open_file_entry(int fhandle) {
@@ -708,6 +708,7 @@ int inode_get_block_number_at_index(inode_t *inode, int index) {
         return -1;
     }
 
+    // if index is in the indirect block
     if (index >= INODE_DIRECT_BLOCK_SIZE) {
         int *block = data_block_get(inode->i_indirect_block);
         if (block == NULL) {
@@ -728,8 +729,6 @@ int inode_get_block_number_at_index(inode_t *inode, int index) {
  */
 int inode_set_block_number_at_index(inode_t *inode, int index,
                                     int i_block_number) {
-    // Allow adding a new block if it's immediately after the last block of the
-    // i_node
     if (index < 0 || index >= INODE_BLOCK_COUNT) {
         return -1;
     }
