@@ -56,11 +56,13 @@ int tfs_open(char const *name, int flags) {
         return -1;
     }
 
+    /* we have to lock this until we make sure the file exists, otherwise
+     * another thread could create the same file at the same time */
     mutex_lock(&tfs_open_mutex);
     inum = tfs_lookup(name);
     if (inum >= 0) {
+        /* The file already exists, so we can let go of the lock */
         mutex_unlock(&tfs_open_mutex);
-        /* The file already exists */
         inode_t *inode = inode_get(inum);
         if (inode == NULL) {
             return -1;
@@ -68,10 +70,7 @@ int tfs_open(char const *name, int flags) {
 
         /* Truncate (if requested) */
         if (flags & TFS_O_TRUNC) {
-
-            if (inode->i_size > 0) {
-                inode_truncate(inum);
-            }
+            inode_truncate(inum);
         }
         /* Determine initial offset */
         if (flags & TFS_O_APPEND) {
@@ -134,9 +133,9 @@ int tfs_copy_to_external_fs(char const *source_path, char const *dest_path) {
     }
 
     char buffer[BLOCK_SIZE];
-
     ssize_t read;
 
+    /* copy BLOCK_SIZE bytes at a time to the external file */
     while ((read = tfs_read(source_file, buffer, BLOCK_SIZE)) > 0) {
         // make sure the entire buffer is written
         if (fwrite(buffer, sizeof(char), (size_t)read, dest_file) !=

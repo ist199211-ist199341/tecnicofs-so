@@ -94,6 +94,7 @@ void state_init() {
  * Destroys FS state
  */
 void state_destroy() {
+    /* destroy all locks (rwlock and mutex) */
     for (size_t i = 0; i < INODE_TABLE_SIZE; i++) {
         rwl_destroy(&inode_locks[i]);
     }
@@ -127,8 +128,8 @@ int inode_create(inode_type n_type) {
         if (freeinode_ts[inumber] == FREE) {
             rwl_unlock(&freeinode_ts_rwl);
             rwl_wrlock(&freeinode_ts_rwl);
-            // Recheck inode status because it might have been changed by
-            // another thread
+            /* Recheck inode status because it might have been changed by
+             * another thread */
             if (freeinode_ts[inumber] != FREE) {
                 rwl_unlock(&freeinode_ts_rwl);
                 rwl_rdlock(&freeinode_ts_rwl);
@@ -138,12 +139,13 @@ int inode_create(inode_type n_type) {
             freeinode_ts[inumber] = TAKEN;
             insert_delay(); // simulate storage access delay (to i-node)
             inode_table[inumber].i_node_type = n_type;
+            inode_table[inumber].i_indirect_block = -1;
 
             if (n_type == T_DIRECTORY) {
                 /* Initializes directory (filling its block with empty
                  * entries, labeled with inumber==-1) */
-                int indirect_block_number = data_block_alloc();
-                if (indirect_block_number == -1) {
+                int directory_block_number = data_block_alloc();
+                if (directory_block_number == -1) {
                     freeinode_ts[inumber] = FREE;
                     rwl_unlock(&freeinode_ts_rwl);
                     return -1;
@@ -152,14 +154,13 @@ int inode_create(inode_type n_type) {
                 inode_table[inumber].i_size = BLOCK_SIZE;
                 /* For simplificaion, a directory will only use the first entry
                  * of the array of data_blocks */
-                inode_table[inumber].i_data_blocks[0] = indirect_block_number;
+                inode_table[inumber].i_data_blocks[0] = directory_block_number;
                 for (int i = 1; i < INODE_DIRECT_BLOCK_SIZE; i++) {
                     inode_table[inumber].i_data_blocks[i] = -1;
                 }
-                inode_table[inumber].i_indirect_block = -1;
 
                 dir_entry_t *dir_entry =
-                    (dir_entry_t *)data_block_get(indirect_block_number);
+                    (dir_entry_t *)data_block_get(directory_block_number);
                 if (dir_entry == NULL) {
                     freeinode_ts[inumber] = FREE;
                     rwl_unlock(&freeinode_ts_rwl);
@@ -176,7 +177,6 @@ int inode_create(inode_type n_type) {
                 for (int i = 0; i < INODE_DIRECT_BLOCK_SIZE; i++) {
                     inode_table[inumber].i_data_blocks[i] = -1;
                 }
-                inode_table[inumber].i_indirect_block = -1;
             }
 
             rwl_unlock(&freeinode_ts_rwl);
@@ -225,6 +225,7 @@ int inode_delete(int inumber) {
 
 /*
  * Deletes all allocated blocks in i-node.
+ * Similar to inode_delete, but does not free the inode.
  * Input:
  *  - inumber: i-node's number
  * Returns: 0 if successful, -1 if failed
@@ -268,6 +269,9 @@ int inode_truncate(int inumber) {
  */
 int inode_delete_data_blocks(inode_t *inode) {
     size_t remaining_size = inode->i_size;
+    if (remaining_size == 0) {
+        return 0;
+    }
     int current_block_i = (int)(remaining_size / BLOCK_SIZE);
     while (current_block_i >= 0) {
         int i_data_block =
@@ -350,9 +354,8 @@ ssize_t inode_write(int fhandle, void const *buffer, size_t to_write) {
             to_write_block = to_write;
         }
 
-        /* If empty file, allocate new block */
+        /* If offset out of bonds of file size, allocate new block */
         if (inode->i_size <= current_block_i * BLOCK_SIZE) {
-
             int new_block = data_block_alloc();
             if (new_block < 0) {
                 /* If it gets an error to alloc block */
@@ -362,6 +365,9 @@ ssize_t inode_write(int fhandle, void const *buffer, size_t to_write) {
             }
             if (inode_set_block_number_at_index(inode, current_block_i,
                                                 new_block) < 0) {
+                /* we're gonna return -1 anyway, ignore error of data_block_free
+                 */
+                data_block_free(new_block);
                 rwl_unlock(&inode_locks[inumber]);
                 mutex_unlock(&file->lock);
                 return -1;
