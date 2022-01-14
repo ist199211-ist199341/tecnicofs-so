@@ -74,35 +74,20 @@ static void insert_delay() {
 void state_init() {
     for (size_t i = 0; i < INODE_TABLE_SIZE; i++) {
         freeinode_ts[i] = FREE;
-        if (pthread_rwlock_init(&inode_locks[i], NULL) != 0) {
-            perror("Failed to init RWlock");
-            exit(EXIT_FAILURE);
-        }
+        rwl_init(&inode_locks[i]);
     }
-    if (pthread_rwlock_init(&freeinode_ts_rwl, NULL) != 0) {
-        perror("Failed to init RWlock");
-        exit(EXIT_FAILURE);
-    }
+    rwl_init(&freeinode_ts_rwl);
 
     for (size_t i = 0; i < DATA_BLOCKS; i++) {
         free_blocks[i] = FREE;
     }
-    if (pthread_rwlock_init(&free_blocks_rwl, NULL) != 0) {
-        perror("Failed to init RWlock");
-        exit(EXIT_FAILURE);
-    }
+    rwl_init(&free_blocks_rwl);
 
     for (size_t i = 0; i < MAX_OPEN_FILES; i++) {
-        if (pthread_mutex_init(&open_file_table[i].lock, NULL) != 0) {
-            perror("Failed to init Mutex");
-            exit(EXIT_FAILURE);
-        }
+        mutex_init(&open_file_table[i].lock);
         free_open_file_entries[i] = FREE;
     }
-    if (pthread_mutex_init(&free_open_file_entries_mutex, NULL) != 0) {
-        perror("Failed to init Mutex");
-        exit(EXIT_FAILURE);
-    }
+    mutex_init(&free_open_file_entries_mutex);
 }
 
 /*
@@ -110,33 +95,18 @@ void state_init() {
  */
 void state_destroy() {
     for (size_t i = 0; i < INODE_TABLE_SIZE; i++) {
-        if (pthread_rwlock_destroy(&inode_locks[i]) != 0) {
-            perror("Failed to destroy RWlock");
-            exit(EXIT_FAILURE);
-        }
+        rwl_destroy(&inode_locks[i]);
     }
 
-    if (pthread_rwlock_destroy(&freeinode_ts_rwl) != 0) {
-        perror("Failed to destroy RWlock");
-        exit(EXIT_FAILURE);
-    }
+    rwl_destroy(&freeinode_ts_rwl);
 
-    if (pthread_rwlock_destroy(&free_blocks_rwl) != 0) {
-        perror("Failed to destroy RWlock");
-        exit(EXIT_FAILURE);
-    }
+    rwl_destroy(&free_blocks_rwl);
 
     for (size_t i = 0; i < MAX_OPEN_FILES; i++) {
-        if (pthread_mutex_destroy(&open_file_table[i].lock) != 0) {
-            perror("Failed to destroy Mutex");
-            exit(EXIT_FAILURE);
-        }
+        mutex_destroy(&open_file_table[i].lock);
     }
 
-    if (pthread_mutex_destroy(&free_open_file_entries_mutex) != 0) {
-        perror("Failed to destroy Mutex");
-        exit(EXIT_FAILURE);
-    }
+    mutex_destroy(&free_open_file_entries_mutex);
 }
 
 /*

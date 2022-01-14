@@ -13,10 +13,7 @@ static pthread_mutex_t tfs_open_mutex;
 int tfs_init() {
     state_init();
 
-    if (pthread_mutex_init(&tfs_open_mutex, NULL) != 0) {
-        perror("Failed to init Mutex");
-        exit(EXIT_FAILURE);
-    }
+    mutex_init(&tfs_open_mutex);
 
     /* create root inode */
     int root = inode_create(T_DIRECTORY);
@@ -30,10 +27,7 @@ int tfs_init() {
 int tfs_destroy() {
     state_destroy();
 
-    if (pthread_mutex_destroy(&tfs_open_mutex) != 0) {
-        perror("Failed to destroy Mutex");
-        exit(EXIT_FAILURE);
-    }
+    mutex_destroy(&tfs_open_mutex);
 
     return 0;
 }
