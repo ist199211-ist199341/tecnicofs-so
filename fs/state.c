@@ -282,9 +282,20 @@ int inode_delete_data_blocks(inode_t *inode) {
         if (data_block_free(i_data_block) == -1) {
             return -1;
         }
+        /* if direct block, make sure to set it to -1 on the inode */
+        if (current_block_i < INODE_DIRECT_BLOCK_SIZE &&
+            inode_set_block_number_at_index(inode, current_block_i, -1) == -1) {
+            return -1;
+        }
 
         --current_block_i;
         remaining_size -= BLOCK_SIZE;
+    }
+    if (inode->i_indirect_block != -1) {
+        if (data_block_free(inode->i_indirect_block) == -1) {
+            return -1;
+        }
+        inode->i_indirect_block = -1;
     }
     inode->i_size = 0;
 
