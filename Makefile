@@ -1,4 +1,4 @@
-# Makefile, v1
+# Makefile, v1.1
 # Sistemas Operativos, DEI/IST/ULisboa 2021-22
 #
 # This makefile should be run from the *root* of the project
@@ -14,16 +14,18 @@ INCLUDES = $(addprefix -I, $(INCLUDE_DIRS))
 SOURCES  := $(wildcard */*.c)
 HEADERS  := $(wildcard */*.h)
 OBJECTS  := $(SOURCES:.c=.o)
-TARGET_EXECS := tests/test1 tests/copy_to_external_simple tests/copy_to_external_errors tests/write_10_blocks_spill tests/write_10_blocks_simple tests/write_more_than_10_blocks_simple tests/write_more_than_10_blocks_spill tests/thread_write_new_files tests/thread_trunc_append tests/thread_read_same_file tests/thread_create_files tests/thread_copy_to_external tests/thread_same_fd tests/block_destroy_simple
+TARGET_EXECS := tests/test1 tests/copy_to_external_simple tests/copy_to_external_errors tests/write_10_blocks_spill tests/write_10_blocks_simple tests/write_more_than_10_blocks_simple tests/write_more_than_10_blocks_spill tests/thread_write_new_files tests/thread_trunc_append tests/thread_read_same_file tests/thread_create_files tests/thread_copy_to_external tests/thread_same_fd tests/thread_create_same_file tests/block_destroy_simple
 
 # VPATH is a variable used by Makefile which finds *sources* and makes them available throughout the codebase
 # vpath %.h <DIR> tells make to look for header files in <DIR>
 vpath # clears VPATH
 vpath %.h $(INCLUDE_DIRS)
 
-LDFLAGS += -lpthread
-LDFLAGS += -fsanitize=thread
-LDFLAGS += -fsanitize=undefined
+# Multi-threading flags
+LDFLAGS += -pthread
+# fsanitize flags
+# LDFLAGS += -fsanitize=thread
+# LDFLAGS += -fsanitize=undefined
 # LDFLAGS += -fsanitize=address
 
 CFLAGS = -std=c11 -D_POSIX_C_SOURCE=200809L
@@ -69,23 +71,25 @@ fmt: $(SOURCES) $(HEADERS)
 # Note the lack of a rule.
 # make uses a set of default rules, one of which compiles C binaries
 # the CC, LD, CFLAGS and LDFLAGS are used in this rule
-tests/test1: tests/test1.o fs/operations.o fs/state.o
-tests/copy_to_external_errors: tests/copy_to_external_errors.o fs/operations.o fs/state.o
-tests/copy_to_external_simple: tests/copy_to_external_simple.o fs/operations.o fs/state.o
-tests/write_10_blocks_spill: tests/write_10_blocks_spill.o fs/operations.o fs/state.o
-tests/write_10_blocks_simple: tests/write_10_blocks_simple.o fs/operations.o fs/state.o
-tests/write_more_than_10_blocks_simple: tests/write_more_than_10_blocks_simple.o fs/operations.o fs/state.o
-tests/write_more_than_10_blocks_spill: tests/write_more_than_10_blocks_spill.o fs/operations.o fs/state.o
-tests/thread_write_new_files: tests/thread_write_new_files.o fs/operations.o fs/state.o
-tests/thread_trunc_append: tests/thread_trunc_append.o fs/operations.o fs/state.o
-tests/thread_read_same_file: tests/thread_read_same_file.o fs/operations.o fs/state.o
-tests/thread_create_files: tests/thread_create_files.o fs/operations.o fs/state.o
-tests/thread_copy_to_external: tests/thread_copy_to_external.o fs/operations.o fs/state.o
-tests/thread_same_fd: tests/thread_same_fd fs/operations.o fs/state.o
-tests/block_destroy_simple: tests/block_destroy_simple fs/operations.o fs/state.o
+
+tests/test1: tests/test1.o fs/operations.o fs/state.o fs/utils.o
+tests/copy_to_external_errors: tests/copy_to_external_errors.o fs/operations.o fs/state.o fs/utils.o
+tests/copy_to_external_simple: tests/copy_to_external_simple.o fs/operations.o fs/state.o fs/utils.o
+tests/write_10_blocks_spill: tests/write_10_blocks_spill.o fs/operations.o fs/state.o fs/utils.o
+tests/write_10_blocks_simple: tests/write_10_blocks_simple.o fs/operations.o fs/state.o fs/utils.o
+tests/write_more_than_10_blocks_simple: tests/write_more_than_10_blocks_simple.o fs/operations.o fs/state.o fs/utils.o
+tests/write_more_than_10_blocks_spill: tests/write_more_than_10_blocks_spill.o fs/operations.o fs/state.o fs/utils.o
+tests/thread_write_new_files: tests/thread_write_new_files.o fs/operations.o fs/state.o fs/utils.o
+tests/thread_trunc_append: tests/thread_trunc_append.o fs/operations.o fs/state.o fs/utils.o
+tests/thread_read_same_file: tests/thread_read_same_file.o fs/operations.o fs/state.o fs/utils.o
+tests/thread_create_files: tests/thread_create_files.o fs/operations.o fs/state.o fs/utils.o
+tests/thread_copy_to_external: tests/thread_copy_to_external.o fs/operations.o fs/state.o fs/utils.o
+tests/thread_same_fd: tests/thread_same_fd.o fs/operations.o fs/state.o fs/utils.o
+tests/thread_create_same_file: tests/thread_create_same_file.o fs/operations.o fs/state.o fs/utils.o
+tests/block_destroy_simple: tests/block_destroy_simple fs/operations.o fs/state.o fs/utils.o
+
 clean:
 	rm -f $(OBJECTS) $(TARGET_EXECS)
-
 
 # This generates a dependency file, with some default dependencies gathered from the include tree
 # The dependencies are gathered in the file autodep. You can find an example illustrating this GCC feature, without Makefile, at this URL: https://renenyffenegger.ch/notes/development/languages/C-C-plus-plus/GCC/options/MM
@@ -93,5 +97,6 @@ clean:
 depend : $(SOURCES)
 	$(CC) $(INCLUDES) -MM $^ > autodep
 
+# Script that compiles the project and runs all the tests, should output "Successful test."
 test: $(TARGET_EXECS)
 	for x in `echo "$(TARGET_EXECS)" | sed "s/ /\n/g" | sed "s/^tests\///g"`; do (cd tests && ./$$x); done
