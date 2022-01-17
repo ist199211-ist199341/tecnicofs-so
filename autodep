@@ -1,33 +1,45 @@
-operations.o: fs/operations.c fs/operations.h fs/config.h fs/state.h \
- fs/utils.h
+tecnicofs_client_api.o: client/tecnicofs_client_api.c \
+ client/tecnicofs_client_api.h common/common.h
+operations.o: fs/operations.c fs/operations.h common/common.h fs/config.h \
+ fs/state.h fs/utils.h
 state.o: fs/state.c fs/state.h fs/config.h fs/utils.h
+tfs_server.o: fs/tfs_server.c fs/operations.h common/common.h fs/config.h \
+ fs/state.h
 utils.o: fs/utils.c
+client_server_simple_test.o: tests/client_server_simple_test.c \
+ client/tecnicofs_client_api.h common/common.h
 copy_to_external_errors.o: tests/copy_to_external_errors.c \
- fs/operations.h fs/config.h fs/state.h
+ fs/operations.h common/common.h fs/config.h fs/state.h
 copy_to_external_simple.o: tests/copy_to_external_simple.c \
- fs/operations.h fs/config.h fs/state.h
-test1.o: tests/test1.c fs/operations.h fs/config.h fs/state.h
+ fs/operations.h common/common.h fs/config.h fs/state.h
+lib_destroy_after_all_closed_test.o: \
+ tests/lib_destroy_after_all_closed_test.c fs/operations.h \
+ common/common.h fs/config.h fs/state.h
+test1.o: tests/test1.c fs/operations.h common/common.h fs/config.h \
+ fs/state.h
 thread_copy_to_external.o: tests/thread_copy_to_external.c \
- fs/operations.h fs/config.h fs/state.h
+ fs/operations.h common/common.h fs/config.h fs/state.h
 thread_create_files.o: tests/thread_create_files.c fs/operations.h \
- fs/config.h fs/state.h
+ common/common.h fs/config.h fs/state.h
 thread_create_same_file.o: tests/thread_create_same_file.c \
- fs/operations.h fs/config.h fs/state.h
+ fs/operations.h common/common.h fs/config.h fs/state.h
 thread_read_same_file.o: tests/thread_read_same_file.c fs/operations.h \
+ common/common.h fs/config.h fs/state.h
+thread_same_fd.o: tests/thread_same_fd.c fs/operations.h common/common.h \
  fs/config.h fs/state.h
-thread_same_fd.o: tests/thread_same_fd.c fs/operations.h fs/config.h \
- fs/state.h
 thread_trunc_append.o: tests/thread_trunc_append.c fs/operations.h \
- fs/config.h fs/state.h
+ common/common.h fs/config.h fs/state.h
 thread_write_new_files.o: tests/thread_write_new_files.c fs/operations.h \
- fs/config.h fs/state.h
+ common/common.h fs/config.h fs/state.h
 write_10_blocks_simple.o: tests/write_10_blocks_simple.c \
- tests/../fs/operations.h tests/../fs/config.h tests/../fs/state.h
+ tests/../fs/operations.h common/common.h tests/../fs/config.h \
+ tests/../fs/state.h
 write_10_blocks_spill.o: tests/write_10_blocks_spill.c \
- tests/../fs/operations.h tests/../fs/config.h tests/../fs/state.h
+ tests/../fs/operations.h common/common.h tests/../fs/config.h \
+ tests/../fs/state.h
 write_more_than_10_blocks_simple.o: \
- tests/write_more_than_10_blocks_simple.c fs/operations.h fs/config.h \
- fs/state.h
+ tests/write_more_than_10_blocks_simple.c fs/operations.h common/common.h \
+ fs/config.h fs/state.h
 write_more_than_10_blocks_spill.o: \
- tests/write_more_than_10_blocks_spill.c fs/operations.h fs/config.h \
- fs/state.h
+ tests/write_more_than_10_blocks_spill.c fs/operations.h common/common.h \
+ fs/config.h fs/state.h

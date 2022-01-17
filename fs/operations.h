@@ -1,15 +1,10 @@
 #ifndef OPERATIONS_H
 #define OPERATIONS_H
 
+#include "common/common.h"
 #include "config.h"
 #include "state.h"
 #include <sys/types.h>
-
-enum {
-    TFS_O_CREAT = 0b001,
-    TFS_O_TRUNC = 0b010,
-    TFS_O_APPEND = 0b100,
-};
 
 /*
  * Initializes tecnicofs
