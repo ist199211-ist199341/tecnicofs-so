@@ -62,7 +62,6 @@ int tfs_open(char const *name, int flags) {
 
     // if tfs_destroy_after_all_closed is called
     if (block_open_new_files) {
-        printf("already locked\n");
         return -1;
     }
 
