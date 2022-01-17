@@ -15,4 +15,6 @@
 
 #define DELAY (5000)
 
+#define SIMULTANEOUS_CONNECTIONS 5
+
 #endif // CONFIG_H

@@ -1,10 +1,28 @@
 #include "tecnicofs_client_api.h"
+#include <fcntl.h>
+#include <stdio.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 int tfs_mount(char const *client_pipe_path, char const *server_pipe_path) {
     (void)client_pipe_path;
     (void)server_pipe_path;
     /* TODO: Implement this */
-    return -1;
+
+    char buffer = TFS_OP_CODE_MOUNT;
+
+    int pipe_out = open(server_pipe_path, O_WRONLY);
+    if (pipe_out < 0) {
+        perror("cannot open pipe");
+        return -1;
+    }
+
+    write(pipe_out, &buffer, sizeof(char));
+
+    close(pipe_out);
+
+    return 0;
 }
 
 int tfs_unmount() {

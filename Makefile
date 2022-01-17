@@ -29,7 +29,7 @@ TARGET_EXECS += tests/thread_create_files
 TARGET_EXECS += tests/thread_copy_to_external
 TARGET_EXECS += tests/thread_same_fd
 TARGET_EXECS += tests/thread_create_same_file
-TARGET_EXECS += tests/lib_destroy_after_all_closed_test
+#TARGET_EXECS += tests/lib_destroy_after_all_closed_test
 TARGET_EXECS += tests/client_server_simple_test
 
 # VPATH is a variable used by Makefile which finds *sources* and makes them available throughout the codebase
