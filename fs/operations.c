@@ -9,9 +9,11 @@
 #include <unistd.h>
 
 static pthread_mutex_t tfs_open_mutex;
+static bool block_open_new_files;
 
 int tfs_init() {
     state_init();
+    block_open_new_files = false;
 
     mutex_init(&tfs_open_mutex);
 
@@ -30,6 +32,13 @@ int tfs_destroy() {
     mutex_destroy(&tfs_open_mutex);
 
     return 0;
+}
+
+int tfs_destroy_after_all_closed() {
+
+    block_open_new_files = true;
+    wait_for_all_files_to_close();
+    return tfs_destroy();
 }
 
 static bool valid_pathname(char const *name) {
@@ -51,13 +60,19 @@ int tfs_open(char const *name, int flags) {
     int inum;
     size_t offset;
 
+    // if tfs_destroy_after_all_closed is called
+    if (block_open_new_files) {
+        return -1;
+    }
+
     /* Checks if the path name is valid */
     if (!valid_pathname(name)) {
         return -1;
     }
 
-    /* we have to lock this until we make sure the file exists, otherwise
-     * another thread could create the same file at the same time */
+    /* we have to lock this until we make sure the file exists,
+     * otherwise another thread could create the same file at the same
+     * time */
     mutex_lock(&tfs_open_mutex);
     inum = tfs_lookup(name);
     if (inum >= 0) {
@@ -79,7 +94,8 @@ int tfs_open(char const *name, int flags) {
             offset = 0;
         }
     } else if (flags & TFS_O_CREAT) {
-        /* The file doesn't exist; the flags specify that it should be created*/
+        /* The file doesn't exist; the flags specify that it should be
+         * created*/
         /* Create inode */
         inum = inode_create(T_FILE);
         if (inum == -1) {
@@ -103,9 +119,9 @@ int tfs_open(char const *name, int flags) {
      * return the corresponding handle */
     return add_to_open_file_table(inum, offset);
 
-    /* Note: for simplification, if file was created with TFS_O_CREAT and there
-     * is an error adding an entry to the open file table, the file is not
-     * opened but it remains created */
+    /* Note: for simplification, if file was created with TFS_O_CREAT and
+     * there is an error adding an entry to the open file table, the file is
+     * not opened but it remains created */
 }
 
 int tfs_close(int fhandle) { return remove_from_open_file_table(fhandle); }

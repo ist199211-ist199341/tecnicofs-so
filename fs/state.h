@@ -3,6 +3,7 @@
 
 #include "config.h"
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -66,6 +67,8 @@ void *data_block_get(int block_number);
 int add_to_open_file_table(int inumber, size_t offset);
 int remove_from_open_file_table(int fhandle);
 open_file_entry_t *get_open_file_entry(int fhandle);
+bool is_any_file_opened();
+void wait_for_all_files_to_close();
 
 int inode_get_block_number_at_index(inode_t *inode, int index);
 int inode_set_block_number_at_index(inode_t *inode, int index,
