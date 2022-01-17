@@ -8,20 +8,18 @@
     tfs_destroy_after_all_closed is correct.
     Note: This test uses TecnicoFS as a library, not
     as a standalone server.
-    We recommend to try out a similar test once the
-    client-server version is ready; further, we suggest
-    trying more elaborate tests of tfs_destroy_after_all_closed
+    We recommend trying more elaborate tests of tfs_destroy_after_all_closed.
+    Also, we suggest trying out a similar test once the
+    client-server version is ready (calling the tfs_shutdown_after_all_closed
+    operation).
 */
 
 int closed_file = 0;
+int f;
 
 void *fn_thread(void *arg) {
     (void)
         arg; /* Since arg is not used, this line prevents a compiler warning */
-
-    int f = tfs_open("/f1", TFS_O_CREAT);
-    printf("f: %d\n", f);
-    assert(f != -1);
 
     sleep(10);
 
@@ -40,6 +38,9 @@ int main() {
     assert(tfs_init() != -1);
 
     pthread_t t;
+    f = tfs_open("/f1", TFS_O_CREAT);
+    assert(f != -1);
+
     assert(pthread_create(&t, NULL, fn_thread, NULL) == 0);
     assert(tfs_destroy_after_all_closed() != -1);
     assert(closed_file == 1);

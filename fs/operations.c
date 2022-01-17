@@ -37,8 +37,6 @@ int tfs_destroy() {
 int tfs_destroy_after_all_closed() {
 
     block_open_new_files = true;
-    printf("lock\n");
-
     wait_for_all_files_to_close();
     return tfs_destroy();
 }
