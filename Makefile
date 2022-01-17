@@ -14,7 +14,23 @@ INCLUDES = $(addprefix -I, $(INCLUDE_DIRS))
 SOURCES  := $(wildcard */*.c)
 HEADERS  := $(wildcard */*.h)
 OBJECTS  := $(SOURCES:.c=.o)
-TARGET_EXECS := fs/tfs_server tests/test1 tests/copy_to_external_simple tests/copy_to_external_errors tests/write_10_blocks_spill tests/write_10_blocks_simple tests/write_more_than_10_blocks_simple tests/write_more_than_10_blocks_spill tests/thread_write_new_files tests/thread_trunc_append tests/thread_read_same_file tests/thread_create_files tests/thread_copy_to_external tests/thread_same_fd tests/thread_create_same_file tests/lib_destroy_after_all_closed_test tests/client_server_simple_test
+TARGET_EXECS := fs/tfs_server
+TARGET_EXECS += tests/test1
+TARGET_EXECS += tests/copy_to_external_simple
+TARGET_EXECS += tests/copy_to_external_errors
+TARGET_EXECS += tests/write_10_blocks_spill
+TARGET_EXECS += tests/write_10_blocks_simple
+TARGET_EXECS += tests/write_more_than_10_blocks_simple
+TARGET_EXECS += tests/write_more_than_10_blocks_spill
+TARGET_EXECS += tests/thread_write_new_files
+TARGET_EXECS += tests/thread_trunc_append
+TARGET_EXECS += tests/thread_read_same_file
+TARGET_EXECS += tests/thread_create_files
+TARGET_EXECS += tests/thread_copy_to_external
+TARGET_EXECS += tests/thread_same_fd
+TARGET_EXECS += tests/thread_create_same_file
+TARGET_EXECS += tests/lib_destroy_after_all_closed_test
+TARGET_EXECS += tests/client_server_simple_test
 
 # VPATH is a variable used by Makefile which finds *sources* and makes them available throughout the codebase
 # vpath %.h <DIR> tells make to look for header files in <DIR>
