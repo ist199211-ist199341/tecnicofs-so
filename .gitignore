@@ -54,3 +54,6 @@ dkms.conf
 # Extras
 *.pdf
 *.txt
+
+# Compiled artifacts
+fs/tfs_server
