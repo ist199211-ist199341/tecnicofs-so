@@ -20,6 +20,7 @@ void *fn_thread(void *arg) {
         arg; /* Since arg is not used, this line prevents a compiler warning */
 
     int f = tfs_open("/f1", TFS_O_CREAT);
+    printf("f: %d\n", f);
     assert(f != -1);
 
     sleep(10);
