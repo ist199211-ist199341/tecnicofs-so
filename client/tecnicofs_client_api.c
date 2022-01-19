@@ -79,7 +79,7 @@ int tfs_open(char const *name, int flags) {
 
     read(pipe_in, &return_value, sizeof(int));
 
-        return return_value;
+    return return_value;
 }
 
 int tfs_close(int fhandle) {
@@ -130,9 +130,18 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
     write(pipe_out, &len, sizeof(size_t));
 
     read(pipe_in, &bytes_read, sizeof(int));
-    if (bytes_read > 0)
-        read(pipe_out, buffer, sizeof(char) * (size_t)bytes_read);
 
+    printf("result: %d\n", bytes_read);
+    fflush(stdout);
+
+    char test[bytes_read];
+
+    if (bytes_read > 0)
+        read(pipe_out, test, sizeof(char) * (size_t)bytes_read);
+
+    printf("buff: %s\n", (char *)test);
+
+    strcpy(buffer, test);
     return (ssize_t)bytes_read;
 }
 

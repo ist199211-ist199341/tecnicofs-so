@@ -164,19 +164,21 @@ void handle_tfs_read(int session_id) {
     read(pipe_in, &fhandle, sizeof(int));
     read(pipe_in, &len, sizeof(size_t));
 
+    printf("fhan: %d  %ld\n", fhandle, len);
+
     char *buffer = malloc(sizeof(char) * len);
 
     int result = (int)tfs_read(fhandle, buffer, len);
 
-    printf("buffer: %s\n", buffer);
-    fflush(stdout);
+    printf("%s\n", buffer);
+
+    printf("resut: %d\n", result);
 
     write(pipe_out, &result, sizeof(int));
 
-    printf("result: %d\n", result);
-    fflush(stdout);
     if (result > 0) {
-        write(pipe_out, buffer, sizeof(char) * (size_t)result);
+        printf("CHADYES\n");
+        write(pipe_out, (void const *)buffer, sizeof(char) * (size_t)result);
     }
 }
 
