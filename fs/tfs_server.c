@@ -40,16 +40,25 @@ int main(int argc, char **argv) {
     bool exit_server = false;
 
     while (!exit_server) {
+
         pipe_in = open(pipename, O_RDONLY);
         if (pipe_in < 0) {
+            printf("sadge\n");
             perror("Failed to open server pipe");
             exit(EXIT_FAILURE);
         }
 
-        ssize_t bytes_read;
+        ssize_t bytes_read = 0;
         char op_code;
         // main listener loop
-        bytes_read = read(pipe_in, &op_code, sizeof(char));
+        while (bytes_read == 0) {
+            bytes_read = read(pipe_in, &op_code, sizeof(char));
+        }
+
+        if (bytes_read < 0) {
+            perror("Failed to read");
+        }
+
         if (bytes_read > 0) {
             switch (op_code) {
             case TFS_OP_CODE_MOUNT:
@@ -78,8 +87,8 @@ int main(int argc, char **argv) {
                 break;
             }
         }
-        close(pipe_in);
     }
+    printf("died: %d\n", pipe_in);
 
     unlink(pipename);
 
