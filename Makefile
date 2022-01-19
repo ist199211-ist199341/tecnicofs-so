@@ -118,4 +118,4 @@ depend : $(SOURCES)
 
 # Script that compiles the project and runs all the tests, should output "Successful test."
 test: $(TARGET_EXECS)
-	for x in `echo "$(TARGET_EXECS)" | sed "s/ /\n/g" | sed "s/^tests\///g"`; do (cd tests && ./$$x); done
+	for x in `echo "$(TARGET_EXECS)" | sed "s/ /\n/g" | grep -vE "^fs\/tfs_server$$" | grep -vE "^tests\/client_" | sed "s/^tests\///g"`; do (cd tests && ./$$x); done
