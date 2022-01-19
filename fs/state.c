@@ -28,6 +28,7 @@ static pthread_rwlock_t free_blocks_rwl;
 static open_file_entry_t open_file_table[MAX_OPEN_FILES];
 static char free_open_file_entries[MAX_OPEN_FILES];
 static pthread_mutex_t free_open_file_entries_mutex;
+static pthread_cond_t files_opened_cond;
 
 static inline bool valid_inumber(int inumber) {
     return inumber >= 0 && inumber < INODE_TABLE_SIZE;
@@ -87,7 +88,13 @@ void state_init() {
         mutex_init(&open_file_table[i].lock);
         free_open_file_entries[i] = FREE;
     }
+
     mutex_init(&free_open_file_entries_mutex);
+
+    if (pthread_cond_init(&files_opened_cond, NULL) != 0) {
+        perror("Failed to init condition variable");
+        exit(EXIT_FAILURE);
+    }
 }
 
 /*
@@ -106,8 +113,12 @@ void state_destroy() {
     for (size_t i = 0; i < MAX_OPEN_FILES; i++) {
         mutex_destroy(&open_file_table[i].lock);
     }
-
     mutex_destroy(&free_open_file_entries_mutex);
+
+    if (pthread_cond_destroy(&files_opened_cond) != 0) {
+        perror("Failed to destroy condition variable");
+        exit(EXIT_FAILURE);
+    }
 }
 
 /*
@@ -669,6 +680,7 @@ int remove_from_open_file_table(int fhandle) {
         return -1;
     }
     free_open_file_entries[fhandle] = FREE;
+    pthread_cond_signal(&files_opened_cond);
     mutex_unlock(&free_open_file_entries_mutex);
     return 0;
 }
@@ -684,6 +696,24 @@ open_file_entry_t *get_open_file_entry(int fhandle) {
     }
     return &open_file_table[fhandle];
 }
+
+bool is_any_file_opened() {
+    for (int i = 0; i < MAX_OPEN_FILES; i++) {
+        if (free_open_file_entries[i] == TAKEN) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void wait_for_all_files_to_close() {
+    mutex_lock(&free_open_file_entries_mutex);
+    while (is_any_file_opened()) {
+        pthread_cond_wait(&files_opened_cond, &free_open_file_entries_mutex);
+    }
+    mutex_unlock(&free_open_file_entries_mutex);
+};
+
 /* Gets the block number given the index of the i-node
  * Inputs:
  *   - inode: pointer to the inode
