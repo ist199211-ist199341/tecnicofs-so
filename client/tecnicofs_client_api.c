@@ -30,13 +30,13 @@ int tfs_mount(char const *client_pipe_path, char const *server_pipe_path) {
         return -1;
     }
 
+    write(pipe_out, &op_code, sizeof(char));
+    write(pipe_out, pipename, sizeof(char) * 40);
+
     pipe_in = open(client_pipe_path, O_RDONLY);
     if (pipe_in < 0) {
         return -1;
     }
-
-    write(pipe_out, &op_code, sizeof(char));
-    write(pipe_out, pipename, sizeof(char) * 40);
 
     read(pipe_in, &session_id, sizeof(int));
 
