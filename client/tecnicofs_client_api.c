@@ -19,6 +19,12 @@ int tfs_mount(char const *client_pipe_path, char const *server_pipe_path) {
 
     strcpy(pipename, client_pipe_path);
 
+    unlink(pipename);
+
+    if (mkfifo(pipename, 0777) < 0) {
+        return -1;
+    }
+
     pipe_out = open(server_pipe_path, O_WRONLY);
     if (pipe_out < 0) {
         return -1;
