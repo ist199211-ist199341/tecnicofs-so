@@ -40,8 +40,6 @@ int main(int argc, char **argv) {
 
     buffer[r] = '\0';
 
-    printf("%s\n", buffer);
-    fflush(stdout);
     assert(strcmp(buffer, str) == 0);
 
     assert(tfs_close(f) != -1);

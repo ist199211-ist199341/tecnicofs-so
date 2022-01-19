@@ -131,17 +131,9 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
 
     read(pipe_in, &bytes_read, sizeof(int));
 
-    printf("result: %d\n", bytes_read);
-    fflush(stdout);
-
-    char test[bytes_read];
-
     if (bytes_read > 0)
-        read(pipe_out, test, sizeof(char) * (size_t)bytes_read);
+        read(pipe_in, buffer, sizeof(char) * (size_t)bytes_read);
 
-    printf("buff: %s\n", (char *)test);
-
-    strcpy(buffer, test);
     return (ssize_t)bytes_read;
 }
 
