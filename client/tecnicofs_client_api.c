@@ -66,16 +66,20 @@ int tfs_open(char const *name, int flags) {
 
     char op_code = TFS_OP_CODE_OPEN;
 
+    char buffer[40];
+
+    strcpy(buffer, name);
+
     int return_value;
 
     write(pipe_out, &op_code, sizeof(char));
     write(pipe_out, &session_id, sizeof(int));
-    write(pipe_out, name, sizeof(char) * 40);
+    write(pipe_out, buffer, sizeof(char) * 40);
     write(pipe_out, &flags, sizeof(int));
 
     read(pipe_in, &return_value, sizeof(int));
 
-    return return_value;
+        return return_value;
 }
 
 int tfs_close(int fhandle) {
@@ -106,7 +110,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t len) {
     write(pipe_out, &session_id, sizeof(int));
     write(pipe_out, &fhandle, sizeof(int));
     write(pipe_out, &len, sizeof(size_t));
-    write(pipe_out, &buffer, sizeof(char) * len);
+    write(pipe_out, buffer, sizeof(char) * len);
 
     read(pipe_in, &return_value, sizeof(int));
     return return_value;
@@ -126,7 +130,8 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
     write(pipe_out, &len, sizeof(size_t));
 
     read(pipe_in, &bytes_read, sizeof(int));
-    read(pipe_out, &buffer, sizeof(char) * (size_t)bytes_read);
+    if (bytes_read > 0)
+        read(pipe_out, buffer, sizeof(char) * (size_t)bytes_read);
 
     return (ssize_t)bytes_read;
 }

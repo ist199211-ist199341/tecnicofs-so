@@ -22,6 +22,11 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    if (tfs_init() == 1) {
+        printf("Failed to init tfs\n");
+        return 1;
+    }
+
     char *pipename = argv[1];
     printf("Starting TecnicoFS server with pipe called %s\n", pipename);
 
@@ -107,7 +112,7 @@ void handle_tfs_open(int session_id) {
 
     char file_name[PIPE_STRING_LENGTH];
     int flags;
-
+    read(pipe_in, &session_id, sizeof(int));
     read(pipe_in, file_name, sizeof(char) * PIPE_STRING_LENGTH);
     read(pipe_in, &flags, sizeof(int));
 
@@ -121,6 +126,8 @@ void handle_tfs_close(int session_id) {
 
     int fhandle;
 
+    read(pipe_in, &session_id, sizeof(int));
+
     read(pipe_in, &fhandle, sizeof(int));
 
     int result = tfs_close(fhandle);
@@ -133,15 +140,16 @@ void handle_tfs_write(int session_id) {
 
     int fhandle;
     size_t len;
+
+    read(pipe_in, &session_id, sizeof(int));
     read(pipe_in, &fhandle, sizeof(int));
     read(pipe_in, &len, sizeof(size_t));
 
     char *buffer = malloc(sizeof(char) * len);
-    read(pipe_in, &len, sizeof(char) * len);
+    read(pipe_in, buffer, sizeof(char) * len);
 
     int result = (int)tfs_write(fhandle, buffer, len);
     free(buffer);
-
     write(pipe_out, &result, sizeof(int));
 }
 
@@ -150,6 +158,9 @@ void handle_tfs_read(int session_id) {
 
     int fhandle;
     size_t len;
+
+    read(pipe_in, &session_id, sizeof(int));
+
     read(pipe_in, &fhandle, sizeof(int));
     read(pipe_in, &len, sizeof(size_t));
 
@@ -157,7 +168,13 @@ void handle_tfs_read(int session_id) {
 
     int result = (int)tfs_read(fhandle, buffer, len);
 
+    printf("buffer: %s\n", buffer);
+    fflush(stdout);
+
     write(pipe_out, &result, sizeof(int));
+
+    printf("result: %d\n", result);
+    fflush(stdout);
     if (result > 0) {
         write(pipe_out, buffer, sizeof(char) * (size_t)result);
     }
