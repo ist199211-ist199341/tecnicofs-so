@@ -51,6 +51,8 @@ int main(int argc, char **argv) {
         pipe_in = open(pipename, O_RDONLY);
         if (pipe_in < 0) {
             perror("Failed to open server pipe");
+            unlink(pipename);
+
             exit(EXIT_FAILURE);
         }
 
@@ -94,6 +96,7 @@ int main(int argc, char **argv) {
         if (bytes_read < 0) {
             perror("Failed to read");
             close(pipe_in);
+            unlink(pipename);
             exit(EXIT_FAILURE);
         }
         close(pipe_in);
