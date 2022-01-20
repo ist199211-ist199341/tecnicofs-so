@@ -43,23 +43,18 @@ int main(int argc, char **argv) {
 
         pipe_in = open(pipename, O_RDONLY);
         if (pipe_in < 0) {
-            printf("sadge\n");
             perror("Failed to open server pipe");
             exit(EXIT_FAILURE);
         }
 
-        ssize_t bytes_read = 0;
+        ssize_t bytes_read;
         char op_code;
+
+        bytes_read = read(pipe_in, &op_code, sizeof(char));
+
         // main listener loop
-        while (bytes_read == 0) {
-            bytes_read = read(pipe_in, &op_code, sizeof(char));
-        }
+        while (bytes_read > 0) {
 
-        if (bytes_read < 0) {
-            perror("Failed to read");
-        }
-
-        if (bytes_read > 0) {
             switch (op_code) {
             case TFS_OP_CODE_MOUNT:
                 handle_tfs_mount();
@@ -86,10 +81,16 @@ int main(int argc, char **argv) {
             default:
                 break;
             }
+            bytes_read = read(pipe_in, &op_code, sizeof(char));
         }
-    }
-    printf("died: %d\n", pipe_in);
 
+        if (bytes_read < 0) {
+            perror("Failed to read");
+            close(pipe_in);
+            exit(EXIT_FAILURE);
+        }
+        close(pipe_in);
+    }
     unlink(pipename);
 
     return 0;
