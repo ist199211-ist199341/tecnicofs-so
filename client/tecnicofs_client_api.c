@@ -1,6 +1,7 @@
 #include "tecnicofs_client_api.h"
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -10,7 +11,7 @@ static int pipe_in;
 static int pipe_out;
 static int session_id;
 
-static char pipename[40];
+static char pipename[PIPE_STRING_LENGTH];
 
 int tfs_mount(char const *client_pipe_path, char const *server_pipe_path) {
 
@@ -32,7 +33,7 @@ int tfs_mount(char const *client_pipe_path, char const *server_pipe_path) {
     }
 
     write(pipe_out, &op_code, sizeof(char));
-    write(pipe_out, pipename, sizeof(char) * 40);
+    write(pipe_out, pipename, sizeof(char) * PIPE_STRING_LENGTH);
 
     pipe_in = open(client_pipe_path, O_RDONLY);
     if (pipe_in < 0) {
@@ -69,7 +70,7 @@ int tfs_open(char const *name, int flags) {
 
     char op_code = TFS_OP_CODE_OPEN;
 
-    char buffer[40];
+    char *buffer = calloc(PIPE_STRING_LENGTH, sizeof(char));
 
     strcpy(buffer, name);
 
@@ -77,7 +78,9 @@ int tfs_open(char const *name, int flags) {
 
     write(pipe_out, &op_code, sizeof(char));
     write(pipe_out, &session_id, sizeof(int));
-    write(pipe_out, buffer, sizeof(char) * 40);
+    write(pipe_out, buffer, sizeof(char) * PIPE_STRING_LENGTH);
+
+    free(buffer);
     write(pipe_out, &flags, sizeof(int));
 
     read(pipe_in, &return_value, sizeof(int));

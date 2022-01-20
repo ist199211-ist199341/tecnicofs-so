@@ -194,6 +194,7 @@ void handle_tfs_read(int session_id) {
         // so far so good
         write(pipe_out, buffer, (sizeof(char) * (size_t)result));
     }
+    free(buffer);
 }
 
 void handle_tfs_shutdown_after_all_closed(int session_id) {
