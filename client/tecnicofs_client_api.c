@@ -10,12 +10,13 @@ static int pipe_in;
 static int pipe_out;
 static int session_id;
 
+static char pipename[40];
+
 int tfs_mount(char const *client_pipe_path, char const *server_pipe_path) {
 
     /* TODO: Implement this */
 
     char op_code = TFS_OP_CODE_MOUNT;
-    char pipename[40];
 
     strcpy(pipename, client_pipe_path);
 
@@ -57,6 +58,8 @@ int tfs_unmount() {
 
     close(pipe_out);
     close(pipe_in);
+
+    unlink(pipename);
 
     return return_value;
 }

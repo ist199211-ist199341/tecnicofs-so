@@ -1,11 +1,14 @@
 #include "operations.h"
 #include <fcntl.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
 static int pipe_in;
 static int pipe_out;
+
+static char *pipename;
 
 void handle_tfs_mount();
 void handle_tfs_unmount(int session_id);
@@ -15,6 +18,8 @@ void handle_tfs_write(int session_id);
 void handle_tfs_read(int session_id);
 void handle_tfs_shutdown_after_all_closed(int session_id);
 
+void close_server_by_user(int s);
+
 int main(int argc, char **argv) {
 
     if (argc < 2) {
@@ -22,12 +27,14 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    signal(SIGINT, close_server_by_user);
+
     if (tfs_init() == 1) {
         printf("Failed to init tfs\n");
         return 1;
     }
 
-    char *pipename = argv[1];
+    pipename = argv[1];
     printf("Starting TecnicoFS server with pipe called %s\n", pipename);
 
     unlink(pipename);
@@ -195,4 +202,16 @@ void handle_tfs_shutdown_after_all_closed(int session_id) {
     printf("TODO shutdown\n");
 
     write(pipe_out, &result, sizeof(int));
+}
+
+void close_server_by_user(int singnum) {
+
+    // todo handle session_id
+    handle_tfs_unmount(0);
+    printf("Sucessfully ended Server\n");
+    printf("Signal num: %d\n", singnum);
+
+    unlink(pipename);
+
+    exit(0);
 }
