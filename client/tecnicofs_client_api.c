@@ -7,6 +7,14 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#define write_pipe(pipe, buffer, size)                                         \
+    if (write(pipe, buffer, size) != size)                                     \
+        return -1;
+
+#define read_pipe(pipe, buffer, size)                                          \
+    if (read(pipe, buffer, size) != size)                                      \
+        return -1;
+
 static int pipe_in;
 static int pipe_out;
 static int session_id;
@@ -32,15 +40,15 @@ int tfs_mount(char const *client_pipe_path, char const *server_pipe_path) {
         return -1;
     }
 
-    write(pipe_out, &op_code, sizeof(char));
-    write(pipe_out, pipename, sizeof(char) * PIPE_STRING_LENGTH);
+    write_pipe(pipe_out, &op_code, sizeof(char));
+    write_pipe(pipe_out, pipename, sizeof(char) * PIPE_STRING_LENGTH);
 
     pipe_in = open(client_pipe_path, O_RDONLY);
     if (pipe_in < 0) {
         return -1;
     }
 
-    read(pipe_in, &session_id, sizeof(int));
+    read_pipe(pipe_in, &session_id, sizeof(int));
 
     return 0;
 }
@@ -52,10 +60,10 @@ int tfs_unmount() {
 
     int return_value;
 
-    write(pipe_out, &op_code, sizeof(char));
-    write(pipe_out, &session_id, sizeof(int));
+    write_pipe(pipe_out, &op_code, sizeof(char));
+    write_pipe(pipe_out, &session_id, sizeof(int));
 
-    read(pipe_in, &return_value, sizeof(int));
+    read_pipe(pipe_in, &return_value, sizeof(int));
 
     close(pipe_out);
     close(pipe_in);
@@ -76,14 +84,14 @@ int tfs_open(char const *name, int flags) {
 
     int return_value;
 
-    write(pipe_out, &op_code, sizeof(char));
-    write(pipe_out, &session_id, sizeof(int));
-    write(pipe_out, buffer, sizeof(char) * PIPE_STRING_LENGTH);
+    write_pipe(pipe_out, &op_code, sizeof(char));
+    write_pipe(pipe_out, &session_id, sizeof(int));
+    write_pipe(pipe_out, buffer, sizeof(char) * PIPE_STRING_LENGTH);
 
     free(buffer);
-    write(pipe_out, &flags, sizeof(int));
+    write_pipe(pipe_out, &flags, sizeof(int));
 
-    read(pipe_in, &return_value, sizeof(int));
+    read_pipe(pipe_in, &return_value, sizeof(int));
 
     return return_value;
 }
@@ -95,11 +103,11 @@ int tfs_close(int fhandle) {
 
     int return_value;
 
-    write(pipe_out, &op_code, sizeof(char));
-    write(pipe_out, &session_id, sizeof(int));
-    write(pipe_out, &fhandle, sizeof(int));
+    write_pipe(pipe_out, &op_code, sizeof(char));
+    write_pipe(pipe_out, &session_id, sizeof(int));
+    write_pipe(pipe_out, &fhandle, sizeof(int));
 
-    read(pipe_in, &return_value, sizeof(int));
+    read_pipe(pipe_in, &return_value, sizeof(int));
 
     return return_value;
 }
@@ -112,13 +120,13 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t len) {
 
     int return_value;
 
-    write(pipe_out, &op_code, sizeof(char));
-    write(pipe_out, &session_id, sizeof(int));
-    write(pipe_out, &fhandle, sizeof(int));
-    write(pipe_out, &len, sizeof(size_t));
-    write(pipe_out, buffer, sizeof(char) * len);
+    write_pipe(pipe_out, &op_code, sizeof(char));
+    write_pipe(pipe_out, &session_id, sizeof(int));
+    write_pipe(pipe_out, &fhandle, sizeof(int));
+    write_pipe(pipe_out, &len, sizeof(size_t));
+    write_pipe(pipe_out, buffer, sizeof(char) * len);
 
-    read(pipe_in, &return_value, sizeof(int));
+    read_pipe(pipe_in, &return_value, sizeof(int));
     return return_value;
 }
 
@@ -130,15 +138,15 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
 
     int bytes_read;
 
-    write(pipe_out, &op_code, sizeof(char));
-    write(pipe_out, &session_id, sizeof(int));
-    write(pipe_out, &fhandle, sizeof(int));
-    write(pipe_out, &len, sizeof(size_t));
+    write_pipe(pipe_out, &op_code, sizeof(char));
+    write_pipe(pipe_out, &session_id, sizeof(int));
+    write_pipe(pipe_out, &fhandle, sizeof(int));
+    write_pipe(pipe_out, &len, sizeof(size_t));
 
-    read(pipe_in, &bytes_read, sizeof(int));
+    read_pipe(pipe_in, &bytes_read, sizeof(int));
 
     if (bytes_read > 0)
-        read(pipe_in, buffer, sizeof(char) * (size_t)bytes_read);
+        read_pipe(pipe_in, buffer, sizeof(char) * (size_t)bytes_read);
 
     return (ssize_t)bytes_read;
 }
@@ -150,10 +158,10 @@ int tfs_shutdown_after_all_closed() {
 
     int return_value;
 
-    write(pipe_out, &op_code, sizeof(char));
-    write(pipe_out, &session_id, sizeof(int));
+    write_pipe(pipe_out, &op_code, sizeof(char));
+    write_pipe(pipe_out, &session_id, sizeof(int));
 
-    read(pipe_in, &return_value, sizeof(int));
+    read_pipe(pipe_in, &return_value, sizeof(int));
 
     return return_value;
 }

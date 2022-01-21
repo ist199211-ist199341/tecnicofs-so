@@ -5,6 +5,20 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#define write_pipe(pipe, buffer, size)                                         \
+    if (write(pipe, buffer, size) != size) {                                   \
+        printf("Erro1\n");                                                     \
+        fflush(stdout);                                                        \
+        exit(EXIT_FAILURE);                                                    \
+    }
+
+#define read_pipe(pipe, buffer, size)                                          \
+    if (read(pipe, buffer, size) != size) {                                    \
+        printf("Erro2\n");                                                     \
+        fflush(stdout);                                                        \
+        exit(EXIT_FAILURE);                                                    \
+    }
+
 static int pipe_in;
 static int pipe_out;
 
@@ -94,7 +108,7 @@ int main(int argc, char **argv) {
         }
 
         if (bytes_read < 0) {
-            perror("Failed to read");
+            perror("Failed to read pipe");
             close(pipe_in);
             unlink(pipename);
             exit(EXIT_FAILURE);
@@ -108,13 +122,13 @@ int main(int argc, char **argv) {
 
 void handle_tfs_mount() {
     char client_pipe_name[PIPE_STRING_LENGTH];
-    read(pipe_in, client_pipe_name, sizeof(char) * PIPE_STRING_LENGTH);
-    // TODO handle read and pipe open errors (?)
+    read_pipe(pipe_in, client_pipe_name, sizeof(char) * PIPE_STRING_LENGTH);
+    // TODO handle read_pipe and pipe open errors (?)
     pipe_out = open(client_pipe_name, O_WRONLY);
 
     // FIXME for now, session id is always 0
     int session_id = 0;
-    write(pipe_out, &session_id, sizeof(int));
+    write_pipe(pipe_out, &session_id, sizeof(int));
 }
 
 void handle_tfs_unmount(int session_id) {
@@ -123,7 +137,7 @@ void handle_tfs_unmount(int session_id) {
     // TODO just have a single session now, nothing to do
 
     int return_value = 0;
-    write(pipe_out, &return_value, sizeof(int));
+    write_pipe(pipe_out, &return_value, sizeof(int));
     close(pipe_out);
 }
 
@@ -132,13 +146,13 @@ void handle_tfs_open(int session_id) {
 
     char file_name[PIPE_STRING_LENGTH];
     int flags;
-    read(pipe_in, &session_id, sizeof(int));
-    read(pipe_in, file_name, sizeof(char) * PIPE_STRING_LENGTH);
-    read(pipe_in, &flags, sizeof(int));
+    read_pipe(pipe_in, &session_id, sizeof(int));
+    read_pipe(pipe_in, file_name, sizeof(char) * PIPE_STRING_LENGTH);
+    read_pipe(pipe_in, &flags, sizeof(int));
 
     int result = tfs_open(file_name, flags);
 
-    write(pipe_out, &result, sizeof(int));
+    write_pipe(pipe_out, &result, sizeof(int));
 }
 
 void handle_tfs_close(int session_id) {
@@ -146,13 +160,13 @@ void handle_tfs_close(int session_id) {
 
     int fhandle;
 
-    read(pipe_in, &session_id, sizeof(int));
+    read_pipe(pipe_in, &session_id, sizeof(int));
 
-    read(pipe_in, &fhandle, sizeof(int));
+    read_pipe(pipe_in, &fhandle, sizeof(int));
 
     int result = tfs_close(fhandle);
 
-    write(pipe_out, &result, sizeof(int));
+    write_pipe(pipe_out, &result, sizeof(int));
 }
 
 void handle_tfs_write(int session_id) {
@@ -161,16 +175,16 @@ void handle_tfs_write(int session_id) {
     int fhandle;
     size_t len;
 
-    read(pipe_in, &session_id, sizeof(int));
-    read(pipe_in, &fhandle, sizeof(int));
-    read(pipe_in, &len, sizeof(size_t));
+    read_pipe(pipe_in, &session_id, sizeof(int));
+    read_pipe(pipe_in, &fhandle, sizeof(int));
+    read_pipe(pipe_in, &len, sizeof(size_t));
 
     char *buffer = malloc(sizeof(char) * len);
-    read(pipe_in, buffer, sizeof(char) * len);
+    read_pipe(pipe_in, buffer, sizeof(char) * len);
 
     int result = (int)tfs_write(fhandle, buffer, len);
     free(buffer);
-    write(pipe_out, &result, sizeof(int));
+    write_pipe(pipe_out, &result, sizeof(int));
 }
 
 void handle_tfs_read(int session_id) {
@@ -179,20 +193,20 @@ void handle_tfs_read(int session_id) {
     int fhandle;
     size_t len;
 
-    read(pipe_in, &session_id, sizeof(int));
+    read_pipe(pipe_in, &session_id, sizeof(int));
 
-    read(pipe_in, &fhandle, sizeof(int));
-    read(pipe_in, &len, sizeof(size_t));
+    read_pipe(pipe_in, &fhandle, sizeof(int));
+    read_pipe(pipe_in, &len, sizeof(size_t));
 
     char *buffer = malloc(sizeof(char) * len);
 
     int result = (int)tfs_read(fhandle, buffer, len);
 
-    write(pipe_out, &result, sizeof(int));
+    write_pipe(pipe_out, &result, sizeof(int));
 
     if (result > 0) {
         // so far so good
-        write(pipe_out, buffer, (sizeof(char) * (size_t)result));
+        write_pipe(pipe_out, buffer, (sizeof(char) * (size_t)result));
     }
     free(buffer);
 }
@@ -205,14 +219,14 @@ void handle_tfs_shutdown_after_all_closed(int session_id) {
     // TODO shutdown server
     printf("TODO shutdown\n");
 
-    write(pipe_out, &result, sizeof(int));
+    write_pipe(pipe_out, &result, sizeof(int));
 }
 
 void close_server_by_user(int singnum) {
 
     // todo handle session_id
-    handle_tfs_unmount(0);
-    printf("Sucessfully ended Server\n");
+    close(pipe_out);
+    printf("\nSucessfully ended Server\n");
     printf("Signal num: %d\n", singnum);
 
     unlink(pipename);
