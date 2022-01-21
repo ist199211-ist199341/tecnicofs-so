@@ -5,6 +5,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#define S 69
+
 #define write_pipe(pipe, buffer, size)                                         \
     if (write(pipe, buffer, size) != size) {                                   \
         printf("Erro1\n");                                                     \
@@ -21,6 +23,7 @@
 
 static int pipe_in;
 static int pipe_out;
+static int current_num_clients;
 
 static char *pipename;
 
@@ -33,6 +36,7 @@ void handle_tfs_read(int session_id);
 void handle_tfs_shutdown_after_all_closed(int session_id);
 
 void close_server_by_user(int s);
+void f(void fn(int));
 
 int main(int argc, char **argv) {
 
@@ -48,6 +52,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    current_num_clients = 0;
     pipename = argv[1];
     printf("Starting TecnicoFS server with pipe called %s\n", pipename);
 
@@ -83,22 +88,22 @@ int main(int argc, char **argv) {
                 handle_tfs_mount();
                 break;
             case TFS_OP_CODE_UNMOUNT:
-                handle_tfs_unmount(0);
+                f(handle_tfs_unmount);
                 break;
             case TFS_OP_CODE_OPEN:
-                handle_tfs_open(0);
+                f(handle_tfs_open);
                 break;
             case TFS_OP_CODE_CLOSE:
-                handle_tfs_close(0);
+                f(handle_tfs_close);
                 break;
             case TFS_OP_CODE_WRITE:
-                handle_tfs_write(0);
+                f(handle_tfs_write);
                 break;
             case TFS_OP_CODE_READ:
-                handle_tfs_read(0);
+                f(handle_tfs_read);
                 break;
             case TFS_OP_CODE_SHUTDOWN_AFTER_ALL_CLOSED:
-                handle_tfs_shutdown_after_all_closed(0);
+                f(handle_tfs_shutdown_after_all_closed);
                 exit_server = true;
                 break;
             default:
@@ -127,18 +132,22 @@ void handle_tfs_mount() {
     pipe_out = open(client_pipe_name, O_WRONLY);
 
     // FIXME for now, session id is always 0
-    int session_id = 0;
+    int session_id = current_num_clients;
+    current_num_clients++;
     write_pipe(pipe_out, &session_id, sizeof(int));
+
+    printf("The session number %d was created with success.\n", session_id);
 }
 
 void handle_tfs_unmount(int session_id) {
-    (void)session_id;
 
     // TODO just have a single session now, nothing to do
 
     int return_value = 0;
     write_pipe(pipe_out, &return_value, sizeof(int));
     close(pipe_out);
+
+    printf("The session number %d was destroyed with success.\n", session_id);
 }
 
 void handle_tfs_open(int session_id) {
@@ -146,7 +155,6 @@ void handle_tfs_open(int session_id) {
 
     char file_name[PIPE_STRING_LENGTH];
     int flags;
-    read_pipe(pipe_in, &session_id, sizeof(int));
     read_pipe(pipe_in, file_name, sizeof(char) * PIPE_STRING_LENGTH);
     read_pipe(pipe_in, &flags, sizeof(int));
 
@@ -160,8 +168,6 @@ void handle_tfs_close(int session_id) {
 
     int fhandle;
 
-    read_pipe(pipe_in, &session_id, sizeof(int));
-
     read_pipe(pipe_in, &fhandle, sizeof(int));
 
     int result = tfs_close(fhandle);
@@ -171,11 +177,9 @@ void handle_tfs_close(int session_id) {
 
 void handle_tfs_write(int session_id) {
     (void)session_id;
-
     int fhandle;
     size_t len;
 
-    read_pipe(pipe_in, &session_id, sizeof(int));
     read_pipe(pipe_in, &fhandle, sizeof(int));
     read_pipe(pipe_in, &len, sizeof(size_t));
 
@@ -192,8 +196,6 @@ void handle_tfs_read(int session_id) {
 
     int fhandle;
     size_t len;
-
-    read_pipe(pipe_in, &session_id, sizeof(int));
 
     read_pipe(pipe_in, &fhandle, sizeof(int));
     read_pipe(pipe_in, &len, sizeof(size_t));
@@ -213,7 +215,6 @@ void handle_tfs_read(int session_id) {
 
 void handle_tfs_shutdown_after_all_closed(int session_id) {
     (void)session_id;
-
     int result = /*tfs_destroy_after_all_closed();*/ 0;
 
     // TODO shutdown server
@@ -223,13 +224,19 @@ void handle_tfs_shutdown_after_all_closed(int session_id) {
 }
 
 void close_server_by_user(int singnum) {
+    (void)singnum;
 
     // todo handle session_id
     close(pipe_out);
-    printf("\nSucessfully ended Server\n");
-    printf("Signal num: %d\n", singnum);
+    printf("\nSucessfully ended  the server.\n");
 
     unlink(pipename);
 
     exit(0);
+}
+
+void f(void fn(int)) {
+    int session_id;
+    read_pipe(pipe_in, &session_id, sizeof(int));
+    fn(session_id);
 }
