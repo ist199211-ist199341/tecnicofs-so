@@ -5,7 +5,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#define S 69
+#define S 5
 
 #define write_pipe(pipe, buffer, size)                                         \
     if (write(pipe, buffer, size) != size) {                                   \
@@ -36,7 +36,7 @@ void handle_tfs_read(int session_id);
 void handle_tfs_shutdown_after_all_closed(int session_id);
 
 void close_server_by_user(int s);
-void f(void fn(int));
+void read_id_and_launch_function(void fn(int));
 
 int main(int argc, char **argv) {
 
@@ -65,15 +65,15 @@ int main(int argc, char **argv) {
 
     bool exit_server = false;
 
+    pipe_in = open(pipename, O_RDONLY);
+    if (pipe_in < 0) {
+        perror("Failed to open server pipe");
+        unlink(pipename);
+
+        exit(EXIT_FAILURE);
+    }
+
     while (!exit_server) {
-
-        pipe_in = open(pipename, O_RDONLY);
-        if (pipe_in < 0) {
-            perror("Failed to open server pipe");
-            unlink(pipename);
-
-            exit(EXIT_FAILURE);
-        }
 
         ssize_t bytes_read;
         char op_code;
@@ -88,22 +88,23 @@ int main(int argc, char **argv) {
                 handle_tfs_mount();
                 break;
             case TFS_OP_CODE_UNMOUNT:
-                f(handle_tfs_unmount);
+                read_id_and_launch_function(handle_tfs_unmount);
                 break;
             case TFS_OP_CODE_OPEN:
-                f(handle_tfs_open);
+                read_id_and_launch_function(handle_tfs_open);
                 break;
             case TFS_OP_CODE_CLOSE:
-                f(handle_tfs_close);
+                read_id_and_launch_function(handle_tfs_close);
                 break;
             case TFS_OP_CODE_WRITE:
-                f(handle_tfs_write);
+                read_id_and_launch_function(handle_tfs_write);
                 break;
             case TFS_OP_CODE_READ:
-                f(handle_tfs_read);
+                read_id_and_launch_function(handle_tfs_read);
                 break;
             case TFS_OP_CODE_SHUTDOWN_AFTER_ALL_CLOSED:
-                f(handle_tfs_shutdown_after_all_closed);
+                read_id_and_launch_function(
+                    handle_tfs_shutdown_after_all_closed);
                 exit_server = true;
                 break;
             default:
@@ -118,8 +119,8 @@ int main(int argc, char **argv) {
             unlink(pipename);
             exit(EXIT_FAILURE);
         }
-        close(pipe_in);
     }
+    close(pipe_in);
     unlink(pipename);
 
     return 0;
@@ -129,14 +130,19 @@ void handle_tfs_mount() {
     char client_pipe_name[PIPE_STRING_LENGTH];
     read_pipe(pipe_in, client_pipe_name, sizeof(char) * PIPE_STRING_LENGTH);
     // TODO handle read_pipe and pipe open errors (?)
+    int session_id;
     pipe_out = open(client_pipe_name, O_WRONLY);
 
-    // FIXME for now, session id is always 0
-    int session_id = current_num_clients;
-    current_num_clients++;
-    write_pipe(pipe_out, &session_id, sizeof(int));
+    if (current_num_clients == S) {
+        session_id = -1;
+        printf("The number of session was exceeded.\n");
 
-    printf("The session number %d was created with success.\n", session_id);
+    } else {
+        session_id = current_num_clients;
+        current_num_clients++;
+        printf("The session number %d was created with success.\n", session_id);
+    }
+    write_pipe(pipe_out, &session_id, sizeof(int));
 }
 
 void handle_tfs_unmount(int session_id) {
@@ -235,7 +241,7 @@ void close_server_by_user(int singnum) {
     exit(0);
 }
 
-void f(void fn(int)) {
+void read_id_and_launch_function(void fn(int)) {
     int session_id;
     read_pipe(pipe_in, &session_id, sizeof(int));
     fn(session_id);
