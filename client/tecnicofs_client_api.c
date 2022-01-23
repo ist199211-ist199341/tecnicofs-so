@@ -50,6 +50,13 @@ int tfs_mount(char const *client_pipe_path, char const *server_pipe_path) {
 
     read_pipe(pipe_in, &session_id, sizeof(int));
 
+    if (session_id == -1) {
+        close(pipe_in);
+        unlink(pipename);
+
+        return -1;
+    }
+
     return 0;
 }
 
