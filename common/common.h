@@ -19,4 +19,6 @@ enum {
     TFS_OP_CODE_SHUTDOWN_AFTER_ALL_CLOSED = 7
 };
 
+#define PIPE_STRING_LENGTH (40)
+
 #endif /* COMMON_H */
