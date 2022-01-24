@@ -95,10 +95,10 @@ int main(int argc, char **argv) {
 
         // read op code
 
-        char op_code;
+        int op_code;
         int session_id;
 
-        buffer_read(&buffer, &op_code, sizeof(char));
+        buffer_read(&buffer, &op_code, sizeof(int));
 
         if (op_code == TFS_OP_CODE_MOUNT) {
             // read pipe_out
@@ -113,7 +113,11 @@ int main(int argc, char **argv) {
 
             // read session_id
             buffer_read(&buffer, &session_id, sizeof(int));
-            workers[session_id].to_execute = op_code;
+
+            char op_code_char = (char)op_code + '0';
+            workers[session_id].to_execute = op_code_char;
+            printf("OLA\n");
+            fflush(stdout);
         }
         workers[session_id].buffer = buffer;
         // needs to be on thread
@@ -329,6 +333,7 @@ void handle_tfs_shutdown_after_all_closed(worker_t *worker) {
 }
 
 int buffer_write(buffer_t *buffer, void *data, size_t size) {
+
     if (buffer->offset + size > PIPE_BUFFER_MAX_LEN) {
         return -1;
     }

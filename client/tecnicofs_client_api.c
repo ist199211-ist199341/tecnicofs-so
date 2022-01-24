@@ -25,7 +25,7 @@ int tfs_mount(char const *client_pipe_path, char const *server_pipe_path) {
 
     /* TODO: Implement this */
 
-    char op_code = TFS_OP_CODE_MOUNT;
+    int op_code = TFS_OP_CODE_MOUNT;
 
     strcpy(pipename, client_pipe_path);
 
@@ -40,7 +40,7 @@ int tfs_mount(char const *client_pipe_path, char const *server_pipe_path) {
         return -1;
     }
 
-    write_pipe(pipe_out, &op_code, sizeof(char));
+    write_pipe(pipe_out, &op_code, sizeof(int));
     write_pipe(pipe_out, pipename, sizeof(char) * PIPE_STRING_LENGTH);
 
     pipe_in = open(client_pipe_path, O_RDONLY);
@@ -85,12 +85,26 @@ int tfs_open(char const *name, int flags) {
 
     // DIVERTE_TE A FZR ISTO
 
-    memcpy(buffer, TFS_OP_CODE_OPEN, sizeof(int));
+    char buffer[PIPE_BUFFER_MAX_LEN];
 
-    snprintf(dummy, sizeof(int), "%d", session_id);
+    char dummy[4];
+
+    char name1[PIPE_STRING_LENGTH];
+
+    for (int i = 0; i < PIPE_STRING_LENGTH; i++) {
+        name1[i] = 0;
+    }
+
+    snprintf(dummy, sizeof(int), "%d", TFS_OP_CODE_OPEN);
+
     strcat(buffer, dummy);
 
-    strcat(buffer, name);
+    snprintf(dummy, sizeof(int), "%d", session_id);
+
+    strcat(buffer, dummy);
+
+    strcpy(name1, name);
+    strcat(buffer, name1);
 
     snprintf(dummy, sizeof(int), "%d", flags);
     strcat(buffer, dummy);
