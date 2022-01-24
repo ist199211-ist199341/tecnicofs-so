@@ -1,6 +1,9 @@
+#include "tfs_server.h"
 #include "operations.h"
+#include "utils.h"
 #include <errno.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <sys/stat.h>
@@ -18,38 +21,32 @@
         exit(EXIT_FAILURE);                                                    \
     }
 
+static worker_t workers[SIMULTANEOUS_CONNECTIONS];
+static bool free_workers[SIMULTANEOUS_CONNECTIONS];
+
 static int pipe_in;
 static int pipe_out;
-static int current_num_clients;
 
 static char *pipename;
 
-void handle_tfs_mount();
-void handle_tfs_unmount(int session_id);
-void handle_tfs_open(int session_id);
-void handle_tfs_close(int session_id);
-void handle_tfs_write(int session_id);
-void handle_tfs_read(int session_id);
-void handle_tfs_shutdown_after_all_closed(int session_id);
-
-void close_server_by_user(int s);
-void read_id_and_launch_function(void fn(int));
-
 int main(int argc, char **argv) {
-
     if (argc < 2) {
         printf("Please specify the pathname of the server's pipe.\n");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     signal(SIGINT, close_server_by_user);
 
-    if (tfs_init() == 1) {
-        printf("Failed to init tfs\n");
-        return 1;
+    if (init_server() != 0) {
+        printf("Failed to init server\n");
+        return EXIT_FAILURE;
     }
 
-    current_num_clients = 0;
+    if (tfs_init() != 0) {
+        printf("Failed to init tfs\n");
+        return EXIT_FAILURE;
+    }
+
     pipename = argv[1];
     printf("Starting TecnicoFS server with pipe called %s\n", pipename);
 
@@ -131,20 +128,50 @@ int main(int argc, char **argv) {
     return 0;
 }
 
+int init_server() {
+    for (int i = 0; i < SIMULTANEOUS_CONNECTIONS; ++i) {
+        workers[i].session_id = i;
+        mutex_init(&workers[i].lock);
+        if (pthread_cond_init(&workers[i].cond, NULL) != 0) {
+            return -1;
+        }
+        if (pthread_create(&workers[i].tid, NULL, session_worker,
+                           &workers[i]) != 0) {
+            return -1;
+        }
+        free_workers[i] = false;
+    }
+    return 0;
+}
+
+int get_available_worker() {
+    for (int i = 0; i < SIMULTANEOUS_CONNECTIONS; ++i) {
+        if (free_workers[i] == false) {
+            free_workers[i] = true;
+            return i;
+        }
+    }
+    return -1;
+}
+
+int free_worker(int session_id) {
+    if (free_workers[session_id] == false) {
+        return -1;
+    }
+    free_workers[session_id] = false;
+    return 0;
+}
+
 void handle_tfs_mount() {
     char client_pipe_name[PIPE_STRING_LENGTH];
     read_pipe(pipe_in, client_pipe_name, sizeof(char) * PIPE_STRING_LENGTH);
     // TODO handle read_pipe and pipe open errors (?)
-    int session_id;
+    int session_id = get_available_worker();
     pipe_out = open(client_pipe_name, O_WRONLY);
 
-    if (current_num_clients >= SIMULTANEOUS_CONNECTIONS) {
-        session_id = -1;
+    if (session_id < 0) {
         printf("The number of sessions was exceeded.\n");
-
     } else {
-        session_id = current_num_clients;
-        current_num_clients++;
         printf("The session number %d was created with success.\n", session_id);
     }
     write_pipe(pipe_out, &session_id, sizeof(int));
@@ -153,9 +180,7 @@ void handle_tfs_mount() {
 void handle_tfs_unmount(int session_id) {
 
     // TODO just have a single session now, nothing to do
-    current_num_clients--;
-
-    int return_value = 0;
+    int return_value = free_worker(session_id);
     write_pipe(pipe_out, &return_value, sizeof(int));
     close(pipe_out);
 
@@ -248,4 +273,13 @@ void read_id_and_launch_function(void fn(int)) {
     int session_id;
     read_pipe(pipe_in, &session_id, sizeof(int));
     fn(session_id);
+}
+
+void *session_worker(void *args) {
+    worker_t *worker = (worker_t *)args;
+
+    (void)worker;
+    // TODO
+
+    return NULL;
 }
