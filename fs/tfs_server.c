@@ -1,11 +1,10 @@
 #include "operations.h"
+#include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-
-#define S 5
 
 #define write_pipe(pipe, buffer, size)                                         \
     if (write(pipe, buffer, size) != size) {                                   \
@@ -56,7 +55,10 @@ int main(int argc, char **argv) {
     pipename = argv[1];
     printf("Starting TecnicoFS server with pipe called %s\n", pipename);
 
-    unlink(pipename);
+    if (unlink(pipename) != 0 && errno != ENOENT) {
+        perror("Failed to delete pipe");
+        exit(EXIT_FAILURE);
+    }
 
     if (mkfifo(pipename, 0777) < 0) {
         perror("Failed to create pipe");
@@ -65,15 +67,14 @@ int main(int argc, char **argv) {
 
     bool exit_server = false;
 
-    pipe_in = open(pipename, O_RDONLY);
-    if (pipe_in < 0) {
-        perror("Failed to open server pipe");
-        unlink(pipename);
-
-        exit(EXIT_FAILURE);
-    }
-
     while (!exit_server) {
+        pipe_in = open(pipename, O_RDONLY);
+        if (pipe_in < 0) {
+            perror("Failed to open server pipe");
+            unlink(pipename);
+
+            exit(EXIT_FAILURE);
+        }
 
         ssize_t bytes_read;
         char op_code;
@@ -116,12 +117,18 @@ int main(int argc, char **argv) {
         if (bytes_read < 0) {
             perror("Failed to read pipe");
             close(pipe_in);
-            unlink(pipename);
+            if (unlink(pipename) != 0) {
+                perror("Failed to delete pipe");
+                exit(EXIT_FAILURE);
+            }
             exit(EXIT_FAILURE);
         }
+        close(pipe_in);
     }
-    close(pipe_in);
-    unlink(pipename);
+    if (unlink(pipename) != 0) {
+        perror("Failed to delete pipe");
+        exit(EXIT_FAILURE);
+    }
 
     return 0;
 }
@@ -133,9 +140,9 @@ void handle_tfs_mount() {
     int session_id;
     pipe_out = open(client_pipe_name, O_WRONLY);
 
-    if (current_num_clients == S) {
+    if (current_num_clients >= SIMULTANEOUS_CONNECTIONS) {
         session_id = -1;
-        printf("The number of session was exceeded.\n");
+        printf("The number of sessions was exceeded.\n");
 
     } else {
         session_id = current_num_clients;
@@ -148,6 +155,7 @@ void handle_tfs_mount() {
 void handle_tfs_unmount(int session_id) {
 
     // TODO just have a single session now, nothing to do
+    current_num_clients--;
 
     int return_value = 0;
     write_pipe(pipe_out, &return_value, sizeof(int));
@@ -221,10 +229,7 @@ void handle_tfs_read(int session_id) {
 
 void handle_tfs_shutdown_after_all_closed(int session_id) {
     (void)session_id;
-    int result = /*tfs_destroy_after_all_closed();*/ 0;
-
-    // TODO shutdown server
-    printf("TODO shutdown\n");
+    int result = tfs_destroy_after_all_closed();
 
     write_pipe(pipe_out, &result, sizeof(int));
 }
@@ -234,7 +239,7 @@ void close_server_by_user(int singnum) {
 
     // todo handle session_id
     close(pipe_out);
-    printf("\nSucessfully ended  the server.\n");
+    printf("\nSucessfully ended the server.\n");
 
     unlink(pipename);
 
