@@ -8,15 +8,13 @@
 
 #define write_pipe(pipe, buffer, size)                                         \
     if (write(pipe, buffer, size) != size) {                                   \
-        printf("Erro1\n");                                                     \
-        fflush(stdout);                                                        \
+        perror("Failed to write to pipe");                                     \
         exit(EXIT_FAILURE);                                                    \
     }
 
 #define read_pipe(pipe, buffer, size)                                          \
     if (read(pipe, buffer, size) != size) {                                    \
-        printf("Erro2\n");                                                     \
-        fflush(stdout);                                                        \
+        perror("Failed to read from pipe");                                    \
         exit(EXIT_FAILURE);                                                    \
     }
 
