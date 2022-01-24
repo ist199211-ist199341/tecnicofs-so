@@ -83,21 +83,21 @@ int tfs_unmount() {
 int tfs_open(char const *name, int flags) {
     /* TODO: Implement this */
 
-    char op_code = TFS_OP_CODE_OPEN;
+    // DIVERTE_TE A FZR ISTO
 
-    char *buffer = calloc(PIPE_STRING_LENGTH, sizeof(char));
+    memcpy(buffer, TFS_OP_CODE_OPEN, sizeof(int));
 
-    strcpy(buffer, name);
+    snprintf(dummy, sizeof(int), "%d", session_id);
+    strcat(buffer, dummy);
+
+    strcat(buffer, name);
+
+    snprintf(dummy, sizeof(int), "%d", flags);
+    strcat(buffer, dummy);
+
+    write_pipe(pipe_out, buffer, sizeof(char) * PIPE_BUFFER_MAX_LEN);
 
     int return_value;
-
-    write_pipe(pipe_out, &op_code, sizeof(char));
-    write_pipe(pipe_out, &session_id, sizeof(int));
-    write_pipe(pipe_out, buffer, sizeof(char) * PIPE_STRING_LENGTH);
-
-    free(buffer);
-    write_pipe(pipe_out, &flags, sizeof(int));
-
     read_pipe(pipe_in, &return_value, sizeof(int));
 
     return return_value;

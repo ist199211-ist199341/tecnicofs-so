@@ -21,4 +21,6 @@ enum {
 
 #define PIPE_STRING_LENGTH (40)
 
+#define PIPE_BUFFER_MAX_LEN (1024) // TODO
+
 #endif /* COMMON_H */
