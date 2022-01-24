@@ -6,6 +6,7 @@
 #include <pthread.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -284,12 +285,11 @@ void *session_worker(void *args) {
 
     mutex_lock(&worker->lock);
 
-    while (!worker->to_read) {
+    while (worker->to_execute == 0) {
         pthread_cond_wait(&worker->cond, &worker->lock);
     }
 
-    char *op_code = worker->buffer;
-    switch (*op_code) {
+    switch (worker->to_execute) {
     case TFS_OP_CODE_UNMOUNT:
         break;
     case TFS_OP_CODE_OPEN:
@@ -307,7 +307,7 @@ void *session_worker(void *args) {
         break;
     }
 
-    worker->to_read = false;
+    worker->to_execute = 0;
 
     mutex_unlock(&worker->lock);
 
@@ -321,4 +321,18 @@ void handle_tfs_open_worker(int8_t *buffer, int pipe_out) {
     int result = tfs_open(name, *flags);
 
     write_pipe(pipe_out, &result, sizeof(int));
+}
+
+int buffer_write(buffer_t *buffer, void *data, size_t size) {
+    if (buffer->offset + size > PIPE_BUFFER_MAX_LEN) {
+        return -1;
+    }
+    memcpy(buffer->data + buffer->offset, data, size);
+    buffer->offset += size;
+    return 0;
+}
+
+void buffer_read(buffer_t *buffer, void *data, size_t size) {
+    memcpy(data, buffer->data + buffer->offset, size);
+    buffer->offset += size;
 }
