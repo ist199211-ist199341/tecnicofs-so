@@ -3,11 +3,14 @@
 
 #include "config.h"
 #include <pthread.h>
+#include <stdbool.h>
 
 /* Represents a worker */
 typedef struct {
     int session_id;
-    char buffer[WORKER_BUFFER_LEN];
+    int8_t buffer[WORKER_BUFFER_LEN];
+    int pipe_out;
+    bool to_read;
     pthread_t tid;
     pthread_mutex_t lock;
     pthread_cond_t cond;
@@ -30,5 +33,7 @@ void close_server_by_user(int s);
 void read_id_and_launch_function(void fn(int));
 
 void *session_worker(void *args);
+
+void handle_tfs_open_worker(int8_t *buffer, int pipe_out);
 
 #endif

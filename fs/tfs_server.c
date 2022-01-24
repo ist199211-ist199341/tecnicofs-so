@@ -25,7 +25,6 @@ static worker_t workers[SIMULTANEOUS_CONNECTIONS];
 static bool free_workers[SIMULTANEOUS_CONNECTIONS];
 
 static int pipe_in;
-static int pipe_out;
 
 static char *pipename;
 
@@ -167,7 +166,8 @@ void handle_tfs_mount() {
     read_pipe(pipe_in, client_pipe_name, sizeof(char) * PIPE_STRING_LENGTH);
     // TODO handle read_pipe and pipe open errors (?)
     int session_id = get_available_worker();
-    pipe_out = open(client_pipe_name, O_WRONLY);
+    int pipe_out = open(client_pipe_name, O_WRONLY);
+    workers[session_id].pipe_out = pipe_out;
 
     if (session_id < 0) {
         printf("The number of sessions was exceeded.\n");
@@ -272,14 +272,53 @@ void close_server_by_user(int singnum) {
 void read_id_and_launch_function(void fn(int)) {
     int session_id;
     read_pipe(pipe_in, &session_id, sizeof(int));
+    worker_t *worker = &workers[session_id];
+    mutex_lock(&worker->lock);
     fn(session_id);
+    pthread_cond_signal(&worker->cond);
+    mutex_unlock(&worker->lock);
 }
 
 void *session_worker(void *args) {
     worker_t *worker = (worker_t *)args;
 
-    (void)worker;
-    // TODO
+    mutex_lock(&worker->lock);
+
+    while (!worker->to_read) {
+        pthread_cond_wait(&worker->cond, &worker->lock);
+    }
+
+    char *op_code = worker->buffer;
+    switch (*op_code) {
+    case TFS_OP_CODE_UNMOUNT:
+        break;
+    case TFS_OP_CODE_OPEN:
+        handle_tfs_open_worker(worker->buffer + sizeof(char), worker->pipe_out);
+        break;
+    case TFS_OP_CODE_CLOSE:
+        break;
+    case TFS_OP_CODE_WRITE:
+        break;
+    case TFS_OP_CODE_READ:
+        break;
+    case TFS_OP_CODE_SHUTDOWN_AFTER_ALL_CLOSED:
+        break;
+    default:
+        break;
+    }
+
+    worker->to_read = false;
+
+    mutex_unlock(&worker->lock);
 
     return NULL;
+}
+
+void handle_tfs_open_worker(int8_t *buffer, int pipe_out) {
+    char *name = (char *)buffer;
+    int *flags = (int *)(buffer + sizeof(char) * PIPE_STRING_LENGTH);
+
+    int result = tfs_open(name, *flags);
+
+    write_pipe(pipe_out, &result, sizeof(int));
 }
