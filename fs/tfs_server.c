@@ -102,9 +102,9 @@ int main(int argc, char **argv) {
                 workers[session_id].to_execute = op_code;
             }
             workers[session_id].packet = packet;
-            // needs to be on thread
 
-            session_worker(&workers[session_id]);
+            pthread_cond_signal(&workers[session_id].cond);
+
             bytes_read = read(pipe_in, &packet, sizeof(packet));
         }
 
@@ -133,6 +133,7 @@ int main(int argc, char **argv) {
 int init_server() {
     for (int i = 0; i < SIMULTANEOUS_CONNECTIONS; ++i) {
         workers[i].session_id = i;
+        workers[i].to_execute = 0;
         mutex_init(&workers[i].lock);
         if (pthread_cond_init(&workers[i].cond, NULL) != 0) {
             return -1;
@@ -175,57 +176,44 @@ void close_server_by_user(int singnum) {
     exit(0);
 }
 
-void read_id_and_launch_function(void fn(int)) {
-    int session_id;
-    read_pipe(pipe_in, &session_id, sizeof(int));
-    worker_t *worker = &workers[session_id];
-    mutex_lock(&worker->lock);
-    fn(session_id);
-    pthread_cond_signal(&worker->cond);
-    mutex_unlock(&worker->lock);
-}
-
 void *session_worker(void *args) {
     worker_t *worker = (worker_t *)args;
+    while (1) {
+        mutex_lock(&worker->lock);
 
-    mutex_lock(&worker->lock);
+        while (worker->to_execute == 0) {
+            pthread_cond_wait(&worker->cond, &worker->lock);
+        }
 
-    while (worker->to_execute == 0) {
-        pthread_cond_wait(&worker->cond, &worker->lock);
+        switch (worker->to_execute) {
+
+        case TFS_OP_CODE_MOUNT:
+            handle_tfs_mount(worker);
+            break;
+        case TFS_OP_CODE_UNMOUNT:
+            handle_tfs_unmount(worker);
+            break;
+        case TFS_OP_CODE_OPEN:
+            handle_tfs_open_worker(worker);
+            break;
+        case TFS_OP_CODE_CLOSE:
+            handle_tfs_close(worker);
+            break;
+        case TFS_OP_CODE_WRITE:
+            handle_tfs_write(worker);
+            break;
+        case TFS_OP_CODE_READ:
+            handle_tfs_read(worker);
+            break;
+        case TFS_OP_CODE_SHUTDOWN_AFTER_ALL_CLOSED:
+            handle_tfs_shutdown_after_all_closed(worker);
+            break;
+        default:
+            break;
+        }
+        worker->to_execute = 0;
+        mutex_unlock(&worker->lock);
     }
-
-    switch (worker->to_execute) {
-
-    case TFS_OP_CODE_MOUNT:
-        handle_tfs_mount(worker);
-        break;
-    case TFS_OP_CODE_UNMOUNT:
-        handle_tfs_unmount(worker);
-        break;
-    case TFS_OP_CODE_OPEN:
-        handle_tfs_open_worker(worker);
-        break;
-    case TFS_OP_CODE_CLOSE:
-        handle_tfs_close(worker);
-        break;
-    case TFS_OP_CODE_WRITE:
-        handle_tfs_write(worker);
-        break;
-    case TFS_OP_CODE_READ:
-        handle_tfs_read(worker);
-        break;
-    case TFS_OP_CODE_SHUTDOWN_AFTER_ALL_CLOSED:
-        handle_tfs_shutdown_after_all_closed(worker);
-        break;
-    default:
-        break;
-    }
-
-    worker->to_execute = 0;
-
-    mutex_unlock(&worker->lock);
-
-    return NULL;
 }
 void handle_tfs_mount(worker_t *worker) {
 
