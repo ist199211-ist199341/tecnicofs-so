@@ -1,6 +1,8 @@
 #ifndef COMMON_H
 #define COMMON_H
 
+#include <stdio.h>
+
 /* tfs_open flags */
 enum {
     TFS_O_CREAT = 0b001,
@@ -20,5 +22,7 @@ enum {
 };
 
 #define PIPE_STRING_LENGTH (40)
+
+#define PIPE_BUFFER_MAX_LEN (1024) // TODO
 
 #endif /* COMMON_H */
