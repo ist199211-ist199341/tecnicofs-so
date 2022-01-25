@@ -5,10 +5,22 @@
 #include "config.h"
 #include <pthread.h>
 #include <stdint.h>
+
 typedef struct {
     int8_t data[WORKER_BUFFER_LEN];
     size_t offset;
 } buffer_t;
+
+typedef struct {
+    char opcode;
+    int session_id;
+    char client_pipe[PIPE_STRING_LENGTH];
+    char file_name[PIPE_STRING_LENGTH];
+    int flags;
+    int fhandle;
+    size_t len;
+    char *buffer;
+} packet_t;
 
 /* Represents a worker */
 typedef struct {

@@ -25,16 +25,4 @@ enum {
 
 #define PIPE_BUFFER_MAX_LEN (1024) // TODO
 
-typedef struct {
-    int opcode;
-    int session_id;
-    char client_pipe[PIPE_STRING_LENGTH];
-    char file_name[PIPE_STRING_LENGTH];
-    int flags;
-    int fhandle;
-    size_t len;
-    char buffer[PIPE_BUFFER_MAX_LEN];
-
-} packet_t;
-
 #endif /* COMMON_H */
