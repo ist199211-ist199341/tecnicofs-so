@@ -73,40 +73,40 @@ int main(int argc, char **argv) {
         }
 
         ssize_t bytes_read;
+        char op_code;
 
-        packet_t packet;
+        bytes_read = read(pipe_in, &op_code, sizeof(char));
 
-        bytes_read = read(pipe_in, &packet, sizeof(packet));
-
+        // main listener loop
         while (bytes_read > 0) {
-            // read op code
 
-            int op_code;
-            int session_id;
-
-            op_code = packet.opcode;
-
-            if (op_code == TFS_OP_CODE_MOUNT) {
-                // read pipe_out
-                session_id = get_available_worker();
-
-                if (session_id == -1) {
-                    exit(EXIT_FAILURE);
-                }
-                workers[session_id].to_execute = TFS_OP_CODE_MOUNT;
-
-            } else {
-
-                // read session_id
-                session_id = packet.session_id;
-
-                workers[session_id].to_execute = op_code;
+            switch (op_code) {
+            case TFS_OP_CODE_MOUNT:
+                handle_tfs_mount();
+                break;
+            case TFS_OP_CODE_UNMOUNT:
+                wrap_packet_parser_fn(NULL, op_code);
+                break;
+            case TFS_OP_CODE_OPEN:
+                wrap_packet_parser_fn(parse_tfs_open_packet, op_code);
+                break;
+            case TFS_OP_CODE_CLOSE:
+                wrap_packet_parser_fn(parse_tfs_close_packet, op_code);
+                break;
+            case TFS_OP_CODE_WRITE:
+                wrap_packet_parser_fn(parse_tfs_write_packet, op_code);
+                break;
+            case TFS_OP_CODE_READ:
+                wrap_packet_parser_fn(parse_tfs_read_packet, op_code);
+                break;
+            case TFS_OP_CODE_SHUTDOWN_AFTER_ALL_CLOSED:
+                wrap_packet_parser_fn(NULL, op_code);
+                exit_server = true;
+                break;
+            default:
+                break;
             }
-            workers[session_id].packet = packet;
-
-            pthread_cond_signal(&workers[session_id].cond);
-
-            bytes_read = read(pipe_in, &packet, sizeof(packet));
+            bytes_read = read(pipe_in, &op_code, sizeof(char));
         }
 
         if (bytes_read < 0) {
@@ -150,6 +150,55 @@ int init_server() {
     return 0;
 }
 
+int handle_tfs_mount() {
+    char client_pipe_name[PIPE_STRING_LENGTH];
+    read_pipe(pipe_in, client_pipe_name, sizeof(char) * PIPE_STRING_LENGTH);
+
+    int session_id = get_available_worker();
+    int pipe_out = open(client_pipe_name, O_WRONLY);
+
+    if (session_id < 0) {
+        printf("The number of sessions was exceeded.\n");
+    } else {
+        printf("The session number %d was created with success.\n", session_id);
+        workers[session_id].pipe_out = pipe_out;
+    }
+
+    write_pipe(pipe_out, &session_id, sizeof(int));
+    return 0;
+}
+
+int parse_tfs_open_packet(worker_t *worker) {
+    read_pipe(pipe_in, &worker->packet.file_name,
+              sizeof(char) * PIPE_STRING_LENGTH);
+    read_pipe(pipe_in, &worker->packet.flags, sizeof(int));
+
+    return 0;
+}
+
+int parse_tfs_close_packet(worker_t *worker) {
+    read_pipe(pipe_in, &worker->packet.fhandle, sizeof(int));
+
+    return 0;
+}
+
+int parse_tfs_write_packet(worker_t *worker) {
+    read_pipe(pipe_in, &worker->packet.fhandle, sizeof(int));
+    read_pipe(pipe_in, &worker->packet.len, sizeof(size_t));
+    char *buffer = (char *)malloc(worker->packet.len * sizeof(char));
+    read_pipe(pipe_in, buffer, worker->packet.len * sizeof(char));
+    worker->packet.buffer = buffer;
+
+    return 0;
+}
+
+int parse_tfs_read_packet(worker_t *worker) {
+    read_pipe(pipe_in, &worker->packet.fhandle, sizeof(int));
+    read_pipe(pipe_in, &worker->packet.len, sizeof(size_t));
+
+    return 0;
+}
+
 int get_available_worker() {
     mutex_lock(&free_worker_lock);
     for (int i = 0; i < SIMULTANEOUS_CONNECTIONS; ++i) {
@@ -189,18 +238,15 @@ void close_server_by_user(int singnum) {
 
 void *session_worker(void *args) {
     worker_t *worker = (worker_t *)args;
-    while (1) {
+    while (true) {
         mutex_lock(&worker->lock);
 
-        while (worker->to_execute == 0) {
+        while (!worker->to_execute) {
             pthread_cond_wait(&worker->cond, &worker->lock);
         }
 
-        switch (worker->to_execute) {
+        switch (worker->packet.opcode) {
 
-        case TFS_OP_CODE_MOUNT:
-            handle_tfs_mount(worker);
-            break;
         case TFS_OP_CODE_UNMOUNT:
             handle_tfs_unmount(worker);
             break;
@@ -222,28 +268,9 @@ void *session_worker(void *args) {
         default:
             break;
         }
-        worker->to_execute = 0;
+        worker->to_execute = false;
         mutex_unlock(&worker->lock);
     }
-}
-void handle_tfs_mount(worker_t *worker) {
-
-    char pipe_client[PIPE_STRING_LENGTH];
-    int result;
-
-    strcpy(pipe_client, worker->packet.client_pipe);
-
-    int pipe_out = open(pipe_client, O_WRONLY);
-    if (pipe_out < 0) {
-        perror("Failed to open server pipe");
-        unlink(pipename);
-
-        exit(EXIT_FAILURE);
-    }
-
-    worker->pipe_out = pipe_out;
-    result = 0;
-    write_pipe(worker->pipe_out, &result, sizeof(int));
 }
 
 void handle_tfs_unmount(worker_t *worker) {
@@ -296,7 +323,7 @@ void handle_tfs_write(worker_t *worker) {
     char buffer[len];
 
     strcpy(buffer, worker->packet.buffer);
-
+    free(worker->packet.buffer);
     size_t result = (size_t)tfs_write(fhandle, buffer, len);
 
     write_pipe(worker->pipe_out, &result, sizeof(int));
@@ -337,4 +364,28 @@ int buffer_write(buffer_t *buffer, void *data, size_t size) {
 void buffer_read(buffer_t *buffer, void *data, size_t size) {
     memcpy(data, buffer->data + buffer->offset, size);
     buffer->offset += size;
+}
+
+int wrap_packet_parser_fn(int parser_fn(worker_t *), char op_code) {
+    int session_id;
+    read_pipe(pipe_in, &session_id, sizeof(int));
+
+    worker_t *worker = &workers[session_id];
+    mutex_lock(&worker->lock);
+    worker->packet.opcode = op_code;
+
+    worker->to_execute = true;
+
+    int result = 0;
+    if (parser_fn != NULL) {
+        result = parser_fn(worker);
+    }
+
+    if (pthread_cond_signal(&worker->cond) != 0) {
+        perror("Couldn't signal worker");
+        exit(EXIT_FAILURE);
+    }
+
+    mutex_unlock(&worker->lock);
+    return result;
 }
