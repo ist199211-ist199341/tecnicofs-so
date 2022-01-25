@@ -8,11 +8,6 @@
 #include <stdint.h>
 
 typedef struct {
-    int8_t data[WORKER_BUFFER_LEN];
-    size_t offset;
-} buffer_t;
-
-typedef struct {
     char opcode;
     char client_pipe[PIPE_STRING_LENGTH];
     char file_name[PIPE_STRING_LENGTH];
@@ -56,9 +51,6 @@ void close_server_by_user(int s);
 void read_id_and_launch_function(void fn(int));
 
 void *session_worker(void *args);
-
-int buffer_write(buffer_t *buffer, void *data, size_t size);
-void buffer_read(buffer_t *buffer, void *data, size_t size);
 
 int wrap_packet_parser_fn(int parser_fn(worker_t *), char op_code);
 

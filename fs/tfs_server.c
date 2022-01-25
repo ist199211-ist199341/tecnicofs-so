@@ -329,21 +329,6 @@ void handle_tfs_shutdown_after_all_closed(worker_t *worker) {
     write_pipe(worker->pipe_out, &result, sizeof(int));
 }
 
-int buffer_write(buffer_t *buffer, void *data, size_t size) {
-
-    if (buffer->offset + size > PIPE_BUFFER_MAX_LEN) {
-        return -1;
-    }
-    memcpy(buffer->data + buffer->offset, data, size);
-    buffer->offset += size;
-    return 0;
-}
-
-void buffer_read(buffer_t *buffer, void *data, size_t size) {
-    memcpy(data, buffer->data + buffer->offset, size);
-    buffer->offset += size;
-}
-
 int wrap_packet_parser_fn(int parser_fn(worker_t *), char op_code) {
     int session_id;
     read_pipe(pipe_in, &session_id, sizeof(int));
