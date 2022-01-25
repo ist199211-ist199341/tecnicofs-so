@@ -254,6 +254,11 @@ void handle_tfs_unmount(worker_t *worker) {
     write_pipe(worker->pipe_out, &result, sizeof(int));
 
     close(worker->pipe_out);
+
+    if (free_worker(worker->session_id) == -1) {
+        perror("Failed to free worker");
+        exit(EXIT_FAILURE);
+    }
 }
 
 void handle_tfs_open_worker(worker_t *worker) {
