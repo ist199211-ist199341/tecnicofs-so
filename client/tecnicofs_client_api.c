@@ -180,7 +180,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t len) {
     packetcpy(packet, &packet_offset, &len, sizeof(size_t));
     packetcpy(packet, &packet_offset, buffer, sizeof(char) * len);
 
-    write_pipe(pipe_out, buffer, packet_len);
+    write_pipe(pipe_out, packet, packet_len);
     free(packet);
 
     int return_value;
