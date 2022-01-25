@@ -134,7 +134,7 @@ int main(int argc, char **argv) {
 int init_server() {
     for (int i = 0; i < SIMULTANEOUS_CONNECTIONS; ++i) {
         workers[i].session_id = i;
-        workers[i].to_execute = 0;
+        workers[i].to_execute = false;
         mutex_init(&workers[i].lock);
         if (pthread_cond_init(&workers[i].cond, NULL) != 0) {
             return -1;
@@ -145,8 +145,33 @@ int init_server() {
         }
         free_workers[i] = false;
     }
-    if (pthread_mutex_init(&free_worker_lock, NULL) != 0)
+    mutex_init(&free_worker_lock);
+    return 0;
+}
+
+int get_available_worker() {
+    mutex_lock(&free_worker_lock);
+    for (int i = 0; i < SIMULTANEOUS_CONNECTIONS; ++i) {
+        if (free_workers[i] == false) {
+            free_workers[i] = true;
+            mutex_unlock(&free_worker_lock);
+            return i;
+        }
+    }
+    mutex_unlock(&free_worker_lock);
+    printf("ALL workers are full\n");
+    return -1;
+}
+
+int free_worker(int session_id) {
+    mutex_lock(&free_worker_lock);
+    if (free_workers[session_id] == false) {
+        mutex_unlock(&free_worker_lock);
         return -1;
+    }
+    free_workers[session_id] = false;
+    mutex_unlock(&free_worker_lock);
+
     return 0;
 }
 
@@ -195,32 +220,6 @@ int parse_tfs_write_packet(worker_t *worker) {
 int parse_tfs_read_packet(worker_t *worker) {
     read_pipe(pipe_in, &worker->packet.fhandle, sizeof(int));
     read_pipe(pipe_in, &worker->packet.len, sizeof(size_t));
-
-    return 0;
-}
-
-int get_available_worker() {
-    mutex_lock(&free_worker_lock);
-    for (int i = 0; i < SIMULTANEOUS_CONNECTIONS; ++i) {
-        if (free_workers[i] == false) {
-            free_workers[i] = true;
-            mutex_unlock(&free_worker_lock);
-            return i;
-        }
-    }
-    mutex_unlock(&free_worker_lock);
-    printf("ALL workers are full\n");
-    return -1;
-}
-
-int free_worker(int session_id) {
-    mutex_lock(&free_worker_lock);
-    if (free_workers[session_id] == false) {
-        mutex_unlock(&free_worker_lock);
-        return -1;
-    }
-    free_workers[session_id] = false;
-    mutex_unlock(&free_worker_lock);
 
     return 0;
 }
