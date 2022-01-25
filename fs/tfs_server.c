@@ -288,61 +288,40 @@ void handle_tfs_unmount(worker_t *worker) {
 }
 
 void handle_tfs_open_worker(worker_t *worker) {
+    packet_t *packet = &worker->packet;
 
-    char name[MAX_FILE_NAME];
-
-    int flags;
-
-    strcpy(name, worker->packet.file_name);
-
-    flags = worker->packet.flags;
-
-    int result = tfs_open(name, flags);
-
+    int result = tfs_open(packet->file_name, packet->flags);
     write_pipe(worker->pipe_out, &result, sizeof(int));
 }
 
 void handle_tfs_close(worker_t *worker) {
-    int fhandle;
+    packet_t *packet = &worker->packet;
 
-    fhandle = worker->packet.fhandle;
-
-    int result = tfs_close(fhandle);
-
+    int result = tfs_close(packet->fhandle);
     write_pipe(worker->pipe_out, &result, sizeof(int));
 }
 
 void handle_tfs_write(worker_t *worker) {
-    int fhandle;
-    size_t len;
+    packet_t *packet = &worker->packet;
 
-    fhandle = worker->packet.fhandle;
-
-    len = worker->packet.len;
-
-    char buffer[len];
-
-    strcpy(buffer, worker->packet.buffer);
-    free(worker->packet.buffer);
-    size_t result = (size_t)tfs_write(fhandle, buffer, len);
-
+    int result = (int)tfs_write(packet->fhandle, packet->buffer, packet->len);
+    fflush(stdout);
     write_pipe(worker->pipe_out, &result, sizeof(int));
+
+    free(worker->packet.buffer);
 }
 
 void handle_tfs_read(worker_t *worker) {
-    int fhandle;
-    size_t len;
+    packet_t *packet = &worker->packet;
+    char *buffer = (char *)malloc(sizeof(char) * packet->len);
 
-    fhandle = worker->packet.fhandle;
-
-    len = worker->packet.len;
-
-    char buffer[len];
-
-    int result = (int)tfs_read(fhandle, buffer, len);
+    int result = (int)tfs_read(packet->fhandle, buffer, packet->len);
 
     write_pipe(worker->pipe_out, &result, sizeof(int));
-    write_pipe(worker->pipe_out, &buffer, (size_t)result * sizeof(char));
+    if (result > 0) {
+        write_pipe(worker->pipe_out, buffer, (size_t)result * sizeof(char));
+    }
+    free(buffer);
 }
 
 void handle_tfs_shutdown_after_all_closed(worker_t *worker) {
