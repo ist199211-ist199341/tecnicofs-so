@@ -25,6 +25,7 @@
 
 static worker_t workers[SIMULTANEOUS_CONNECTIONS];
 static bool free_workers[SIMULTANEOUS_CONNECTIONS];
+static pthread_mutex_t free_worker_lock;
 
 static int pipe_in;
 
@@ -144,24 +145,34 @@ int init_server() {
         }
         free_workers[i] = false;
     }
+    if (pthread_mutex_init(&free_worker_lock, NULL) != 0)
+        return -1;
     return 0;
 }
 
 int get_available_worker() {
+    mutex_lock(&free_worker_lock);
     for (int i = 0; i < SIMULTANEOUS_CONNECTIONS; ++i) {
         if (free_workers[i] == false) {
             free_workers[i] = true;
+            mutex_unlock(&free_worker_lock);
             return i;
         }
     }
+    mutex_unlock(&free_worker_lock);
+    printf("ALL workers are full\n");
     return -1;
 }
 
 int free_worker(int session_id) {
+    mutex_lock(&free_worker_lock);
     if (free_workers[session_id] == false) {
+        mutex_unlock(&free_worker_lock);
         return -1;
     }
     free_workers[session_id] = false;
+    mutex_unlock(&free_worker_lock);
+
     return 0;
 }
 
