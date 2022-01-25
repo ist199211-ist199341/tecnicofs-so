@@ -1,6 +1,7 @@
 #ifndef TFS_SERVER_H
 #define TFS_SERVER_H
 
+#include "common/common.h"
 #include "config.h"
 #include <pthread.h>
 #include <stdint.h>
@@ -12,9 +13,9 @@ typedef struct {
 /* Represents a worker */
 typedef struct {
     int session_id;
-    buffer_t buffer;
+    packet_t packet;
     int pipe_out;
-    char to_execute;
+    int to_execute;
     pthread_t tid;
     pthread_mutex_t lock;
     pthread_cond_t cond;

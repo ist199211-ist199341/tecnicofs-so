@@ -68,64 +68,60 @@ int main(int argc, char **argv) {
         if (pipe_in < 0) {
             perror("Failed to open server pipe");
             unlink(pipename);
-
             exit(EXIT_FAILURE);
         }
 
         ssize_t bytes_read;
 
-        buffer_t buffer;
-        buffer.offset = 0;
+        packet_t packet;
 
-        bytes_read =
-            read(pipe_in, buffer.data, sizeof(int8_t) * PIPE_BUFFER_MAX_LEN);
+        bytes_read = read(pipe_in, &packet, sizeof(packet));
 
-        printf("bytes lidos: %ld\n", bytes_read);
-        fflush(stdout);
+        while (bytes_read > 0) {
+            // read op code
+
+            int op_code;
+            int session_id;
+
+            op_code = packet.opcode;
+
+            if (op_code == TFS_OP_CODE_MOUNT) {
+                // read pipe_out
+                session_id = get_available_worker();
+
+                if (session_id == -1) {
+                    exit(EXIT_FAILURE);
+                }
+                workers[session_id].to_execute = TFS_OP_CODE_MOUNT;
+
+            } else {
+
+                // read session_id
+                session_id = packet.session_id;
+
+                workers[session_id].to_execute = op_code;
+            }
+            workers[session_id].packet = packet;
+            // needs to be on thread
+
+            session_worker(&workers[session_id]);
+            bytes_read = read(pipe_in, &packet, sizeof(packet));
+        }
 
         if (bytes_read < 0) {
             perror("Failed to read pipe");
             close(pipe_in);
             if (unlink(pipename) != 0) {
                 perror("Failed to delete pipe");
-                exit(EXIT_FAILURE);
             }
             exit(EXIT_FAILURE);
         }
-
-        // read op code
-
-        int op_code;
-        int session_id;
-
-        buffer_read(&buffer, &op_code, sizeof(int));
-
-        if (op_code == TFS_OP_CODE_MOUNT) {
-            // read pipe_out
-            session_id = get_available_worker();
-
-            if (session_id == -1) {
-                exit(EXIT_FAILURE);
-            }
-            workers[session_id].to_execute = TFS_OP_CODE_MOUNT;
-
-        } else {
-
-            // read session_id
-            buffer_read(&buffer, &session_id, sizeof(int));
-
-            char op_code_char = (char)op_code + '0';
-            workers[session_id].to_execute = op_code_char;
-            printf("OLA\n");
-            fflush(stdout);
+        if (close(pipe_in) < 0) {
+            perror("Failed to close pipe");
+            exit(EXIT_FAILURE);
         }
-        workers[session_id].buffer = buffer;
-        // needs to be on thread
-
-        session_worker(&workers[session_id]);
-
-        close(pipe_in);
     }
+
     if (unlink(pipename) != 0) {
         perror("Failed to delete pipe");
         exit(EXIT_FAILURE);
@@ -236,8 +232,7 @@ void handle_tfs_mount(worker_t *worker) {
     char pipe_client[PIPE_STRING_LENGTH];
     int result;
 
-    buffer_read(&worker->buffer, &pipe_client,
-                sizeof(char) * PIPE_STRING_LENGTH);
+    strcpy(pipe_client, worker->packet.client_pipe);
 
     int pipe_out = open(pipe_client, O_WRONLY);
     if (pipe_out < 0) {
@@ -267,18 +262,9 @@ void handle_tfs_open_worker(worker_t *worker) {
 
     int flags;
 
-    printf(" antes de ler buffer %ld \n", worker->buffer.offset);
-    fflush(stdout);
-    buffer_read(&worker->buffer, name, (sizeof(char) * MAX_FILE_NAME));
+    strcpy(name, worker->packet.file_name);
 
-    printf("antes de ler flag %ld \n", worker->buffer.offset);
-    fflush(stdout);
-
-    buffer_read(&worker->buffer, &flags, sizeof(int));
-
-    printf("depois de ler flag %s %d offset: %ld\n", name, flags,
-           worker->buffer.offset);
-    fflush(stdout);
+    flags = worker->packet.flags;
 
     int result = tfs_open(name, flags);
 
@@ -288,7 +274,7 @@ void handle_tfs_open_worker(worker_t *worker) {
 void handle_tfs_close(worker_t *worker) {
     int fhandle;
 
-    buffer_read(&worker->buffer, &fhandle, sizeof(int));
+    fhandle = worker->packet.fhandle;
 
     int result = tfs_close(fhandle);
 
@@ -298,11 +284,14 @@ void handle_tfs_close(worker_t *worker) {
 void handle_tfs_write(worker_t *worker) {
     int fhandle;
     size_t len;
-    buffer_read(&worker->buffer, &fhandle, sizeof(int));
-    buffer_read(&worker->buffer, &len, sizeof(size_t));
+
+    fhandle = worker->packet.fhandle;
+
+    len = worker->packet.len;
 
     char buffer[len];
-    buffer_read(&worker->buffer, &buffer, sizeof(char) * len);
+
+    strcpy(buffer, worker->packet.buffer);
 
     size_t result = (size_t)tfs_write(fhandle, buffer, len);
 
@@ -312,18 +301,17 @@ void handle_tfs_write(worker_t *worker) {
 void handle_tfs_read(worker_t *worker) {
     int fhandle;
     size_t len;
-    buffer_read(&worker->buffer, &fhandle, sizeof(int));
-    buffer_read(&worker->buffer, &len, sizeof(size_t));
 
-    len++;
+    fhandle = worker->packet.fhandle;
+
+    len = worker->packet.len;
 
     char buffer[len];
 
-    size_t result = (size_t)tfs_read(fhandle, buffer + 1, len - 1);
+    int result = (int)tfs_read(fhandle, buffer, len);
 
-    buffer[0] = (char)result;
-
-    write_pipe(worker->pipe_out, buffer, len * sizeof(char));
+    write_pipe(worker->pipe_out, &result, sizeof(int));
+    write_pipe(worker->pipe_out, &buffer, (size_t)result * sizeof(char));
 }
 
 void handle_tfs_shutdown_after_all_closed(worker_t *worker) {

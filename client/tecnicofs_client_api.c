@@ -8,12 +8,16 @@
 #include <unistd.h>
 
 #define write_pipe(pipe, buffer, size)                                         \
-    if (write(pipe, buffer, size) != size)                                     \
-        return -1;
+    if (write(pipe, buffer, size) != size) {                                   \
+        perror("Failed to write to pipe");                                     \
+        exit(EXIT_FAILURE);                                                    \
+    }
 
 #define read_pipe(pipe, buffer, size)                                          \
-    if (read(pipe, buffer, size) != size)                                      \
-        return -1;
+    if (read(pipe, buffer, size) != size) {                                    \
+        perror("Failed to read from pipe");                                    \
+        exit(EXIT_FAILURE);                                                    \
+    }
 
 static int pipe_in;
 static int pipe_out;
@@ -40,8 +44,12 @@ int tfs_mount(char const *client_pipe_path, char const *server_pipe_path) {
         return -1;
     }
 
-    write_pipe(pipe_out, &op_code, sizeof(int));
-    write_pipe(pipe_out, pipename, sizeof(char) * PIPE_STRING_LENGTH);
+    packet_t packet;
+
+    packet.opcode = op_code;
+    strcpy(packet.client_pipe, pipename);
+
+    write_pipe(pipe_out, &packet, sizeof(packet));
 
     pipe_in = open(client_pipe_path, O_RDONLY);
     if (pipe_in < 0) {
@@ -63,12 +71,16 @@ int tfs_mount(char const *client_pipe_path, char const *server_pipe_path) {
 int tfs_unmount() {
     /* TODO: Implement this */
 
-    char op_code = TFS_OP_CODE_UNMOUNT;
+    int op_code = TFS_OP_CODE_UNMOUNT;
 
     int return_value;
 
-    write_pipe(pipe_out, &op_code, sizeof(char));
-    write_pipe(pipe_out, &session_id, sizeof(int));
+    packet_t packet;
+
+    packet.opcode = op_code;
+    packet.session_id = session_id;
+
+    write_pipe(pipe_out, &packet, sizeof(packet));
 
     read_pipe(pipe_in, &return_value, sizeof(int));
 
@@ -83,33 +95,15 @@ int tfs_unmount() {
 int tfs_open(char const *name, int flags) {
     /* TODO: Implement this */
 
-    // DIVERTE_TE A FZR ISTO
+    packet_t packet;
 
-    char buffer[PIPE_BUFFER_MAX_LEN];
+    packet.opcode = TFS_OP_CODE_OPEN;
+    packet.session_id = session_id;
 
-    char dummy[4];
+    strcpy(packet.file_name, name);
+    packet.flags = flags;
 
-    char name1[PIPE_STRING_LENGTH];
-
-    for (int i = 0; i < PIPE_STRING_LENGTH; i++) {
-        name1[i] = 0;
-    }
-
-    snprintf(dummy, sizeof(int), "%d", TFS_OP_CODE_OPEN);
-
-    strcat(buffer, dummy);
-
-    snprintf(dummy, sizeof(int), "%d", session_id);
-
-    strcat(buffer, dummy);
-
-    strcpy(name1, name);
-    strcat(buffer, name1);
-
-    snprintf(dummy, sizeof(int), "%d", flags);
-    strcat(buffer, dummy);
-
-    write_pipe(pipe_out, buffer, sizeof(char) * PIPE_BUFFER_MAX_LEN);
+    write_pipe(pipe_out, &packet, sizeof(packet));
 
     int return_value;
     read_pipe(pipe_in, &return_value, sizeof(int));
@@ -120,13 +114,17 @@ int tfs_open(char const *name, int flags) {
 int tfs_close(int fhandle) {
     /* TODO: Implement this */
 
-    char op_code = TFS_OP_CODE_CLOSE;
+    int op_code = TFS_OP_CODE_CLOSE;
+
+    packet_t packet;
+
+    packet.opcode = op_code;
+    packet.session_id = session_id;
+    packet.fhandle = fhandle;
+
+    write_pipe(pipe_out, &packet, sizeof(packet));
 
     int return_value;
-
-    write_pipe(pipe_out, &op_code, sizeof(char));
-    write_pipe(pipe_out, &session_id, sizeof(int));
-    write_pipe(pipe_out, &fhandle, sizeof(int));
 
     read_pipe(pipe_in, &return_value, sizeof(int));
 
@@ -137,17 +135,22 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t len) {
 
     /* TODO: Implement this */
 
-    char op_code = TFS_OP_CODE_WRITE;
+    int op_code = TFS_OP_CODE_WRITE;
 
     int return_value;
 
-    write_pipe(pipe_out, &op_code, sizeof(char));
-    write_pipe(pipe_out, &session_id, sizeof(int));
-    write_pipe(pipe_out, &fhandle, sizeof(int));
-    write_pipe(pipe_out, &len, sizeof(size_t));
-    write_pipe(pipe_out, buffer, sizeof(char) * len);
+    packet_t packet;
+
+    packet.opcode = op_code;
+    packet.session_id = session_id;
+    packet.fhandle = fhandle;
+    packet.len = len;
+    strcpy(packet.buffer, buffer);
+
+    write_pipe(pipe_out, &packet, sizeof(packet));
 
     read_pipe(pipe_in, &return_value, sizeof(int));
+
     return return_value;
 }
 
@@ -155,19 +158,24 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
 
     /* TODO: Implement this */
 
-    char op_code = TFS_OP_CODE_READ;
+    (void)buffer;
 
-    int bytes_read;
+    int op_code = TFS_OP_CODE_READ;
 
-    write_pipe(pipe_out, &op_code, sizeof(char));
-    write_pipe(pipe_out, &session_id, sizeof(int));
-    write_pipe(pipe_out, &fhandle, sizeof(int));
-    write_pipe(pipe_out, &len, sizeof(size_t));
+    size_t bytes_read;
+
+    packet_t packet;
+
+    packet.opcode = op_code;
+    packet.session_id = session_id;
+    packet.fhandle = fhandle;
+    packet.len = len;
+
+    write_pipe(pipe_out, &packet, sizeof(packet));
 
     read_pipe(pipe_in, &bytes_read, sizeof(int));
 
-    if (bytes_read > 0)
-        read_pipe(pipe_in, buffer, sizeof(char) * (size_t)bytes_read);
+    read_pipe(pipe_in, buffer, sizeof(char) * bytes_read);
 
     return (ssize_t)bytes_read;
 }
@@ -175,12 +183,16 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
 int tfs_shutdown_after_all_closed() {
     /* TODO: Implement this */
 
-    char op_code = TFS_OP_CODE_SHUTDOWN_AFTER_ALL_CLOSED;
+    int op_code = TFS_OP_CODE_SHUTDOWN_AFTER_ALL_CLOSED;
 
     int return_value;
 
-    write_pipe(pipe_out, &op_code, sizeof(char));
-    write_pipe(pipe_out, &session_id, sizeof(int));
+    packet_t packet;
+
+    packet.opcode = op_code;
+    packet.session_id = session_id;
+
+    write_pipe(pipe_out, &packet, sizeof(packet));
 
     read_pipe(pipe_in, &return_value, sizeof(int));
 
