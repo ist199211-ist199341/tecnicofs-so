@@ -57,3 +57,5 @@ dkms.conf
 
 # Compiled artifacts
 fs/tfs_server
+
+.vscode

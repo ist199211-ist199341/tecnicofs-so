@@ -1,6 +1,6 @@
-# tecnicofs-so-proj1
+# tecnicofs-so
 
-Operating System's course Project 1: TécnicoFS
+Operating System's course Project: TécnicoFS
 
 ## TécnicoFS Base Project
 
