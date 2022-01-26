@@ -5,8 +5,8 @@
 #include "config.h"
 #include <pthread.h>
 #include <stdbool.h>
-#include <stdint.h>
 
+/* Represents a packet */
 typedef struct {
     char opcode;
     char client_pipe[PIPE_STRING_LENGTH];
@@ -28,11 +28,34 @@ typedef struct {
     pthread_cond_t cond;
 } worker_t;
 
+/*
+ * Initializes the server.
+ * Returns 0 if successful, -1 otherwise.
+ */
 int init_server();
 
+/*
+ * Returns a worker.
+ * Returns session_id if there is a worker available, -1 otherwise.
+ */
 int get_available_worker();
+
+/*
+ * Changes the state of the worker to free.
+ * Returns 0 if successful, -1 otherwise.
+ */
 int free_worker(int session_id);
 
+int parse_tfs_open_packet();
+int parse_tfs_close_packet();
+int parse_tfs_write_packet();
+int parse_tfs_read_packet();
+
+int wrap_packet_parser_fn(int parser_fn(worker_t *), char op_code);
+
+void *session_worker(void *args);
+
+int handle_tfs_mount();
 void handle_tfs_unmount(worker_t *worker);
 void handle_tfs_open_worker(worker_t *worker);
 void handle_tfs_open_worker(worker_t *worker);
@@ -41,17 +64,6 @@ void handle_tfs_read(worker_t *worker);
 void handle_tfs_close(worker_t *worker);
 void handle_tfs_shutdown_after_all_closed(worker_t *worker);
 
-int handle_tfs_mount();
-int parse_tfs_open_packet();
-int parse_tfs_close_packet();
-int parse_tfs_write_packet();
-int parse_tfs_read_packet();
-
 void close_server_by_user(int s);
-void read_id_and_launch_function(void fn(int));
-
-void *session_worker(void *args);
-
-int wrap_packet_parser_fn(int parser_fn(worker_t *), char op_code);
 
 #endif

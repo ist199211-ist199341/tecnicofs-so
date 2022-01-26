@@ -6,17 +6,18 @@
 #include <pthread.h>
 #include <signal.h>
 #include <stdbool.h>
-#include <stdint.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
+/* check if all the content was written to the pipe. */
 #define write_pipe(pipe, buffer, size)                                         \
     if (write(pipe, buffer, size) != size) {                                   \
         perror("Failed to write to pipe");                                     \
         exit(EXIT_FAILURE);                                                    \
     }
 
+/* check if all the content was read from the pipe. */
 #define read_pipe(pipe, buffer, size)                                          \
     if (read(pipe, buffer, size) != size) {                                    \
         perror("Failed to read from pipe");                                    \
@@ -175,24 +176,6 @@ int free_worker(int session_id) {
     return 0;
 }
 
-int handle_tfs_mount() {
-    char client_pipe_name[PIPE_STRING_LENGTH];
-    read_pipe(pipe_in, client_pipe_name, sizeof(char) * PIPE_STRING_LENGTH);
-
-    int session_id = get_available_worker();
-    int pipe_out = open(client_pipe_name, O_WRONLY);
-
-    if (session_id < 0) {
-        printf("The number of sessions was exceeded.\n");
-    } else {
-        printf("The session number %d was created with success.\n", session_id);
-        workers[session_id].pipe_out = pipe_out;
-    }
-
-    write_pipe(pipe_out, &session_id, sizeof(int));
-    return 0;
-}
-
 int parse_tfs_open_packet(worker_t *worker) {
     read_pipe(pipe_in, &worker->packet.file_name,
               sizeof(char) * PIPE_STRING_LENGTH);
@@ -224,15 +207,28 @@ int parse_tfs_read_packet(worker_t *worker) {
     return 0;
 }
 
-void close_server_by_user(int singnum) {
-    (void)singnum;
+int wrap_packet_parser_fn(int parser_fn(worker_t *), char op_code) {
+    int session_id;
+    read_pipe(pipe_in, &session_id, sizeof(int));
 
-    // todo handle session_id
-    printf("\nSucessfully ended the server.\n");
+    worker_t *worker = &workers[session_id];
+    mutex_lock(&worker->lock);
+    worker->packet.opcode = op_code;
 
-    unlink(pipename);
+    worker->to_execute = true;
 
-    exit(0);
+    int result = 0;
+    if (parser_fn != NULL) {
+        result = parser_fn(worker);
+    }
+
+    if (pthread_cond_signal(&worker->cond) != 0) {
+        perror("Couldn't signal worker");
+        exit(EXIT_FAILURE);
+    }
+
+    mutex_unlock(&worker->lock);
+    return result;
 }
 
 void *session_worker(void *args) {
@@ -272,6 +268,23 @@ void *session_worker(void *args) {
     }
 }
 
+int handle_tfs_mount() {
+    char client_pipe_name[PIPE_STRING_LENGTH];
+    read_pipe(pipe_in, client_pipe_name, sizeof(char) * PIPE_STRING_LENGTH);
+
+    int session_id = get_available_worker();
+    int pipe_out = open(client_pipe_name, O_WRONLY);
+
+    if (session_id < 0) {
+        printf("The number of sessions was exceeded.\n");
+    } else {
+        printf("The session number %d was created with success.\n", session_id);
+        workers[session_id].pipe_out = pipe_out;
+    }
+
+    write_pipe(pipe_out, &session_id, sizeof(int));
+    return 0;
+}
 void handle_tfs_unmount(worker_t *worker) {
     int result = 0;
 
@@ -328,26 +341,13 @@ void handle_tfs_shutdown_after_all_closed(worker_t *worker) {
     write_pipe(worker->pipe_out, &result, sizeof(int));
 }
 
-int wrap_packet_parser_fn(int parser_fn(worker_t *), char op_code) {
-    int session_id;
-    read_pipe(pipe_in, &session_id, sizeof(int));
+void close_server_by_user(int singnum) {
+    (void)singnum;
 
-    worker_t *worker = &workers[session_id];
-    mutex_lock(&worker->lock);
-    worker->packet.opcode = op_code;
+    // todo handle session_id
+    printf("\nSucessfully ended the server.\n");
 
-    worker->to_execute = true;
+    unlink(pipename);
 
-    int result = 0;
-    if (parser_fn != NULL) {
-        result = parser_fn(worker);
-    }
-
-    if (pthread_cond_signal(&worker->cond) != 0) {
-        perror("Couldn't signal worker");
-        exit(EXIT_FAILURE);
-    }
-
-    mutex_unlock(&worker->lock);
-    return result;
+    exit(0);
 }
