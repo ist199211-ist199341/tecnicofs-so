@@ -273,7 +273,6 @@ void *session_worker(void *args) {
 }
 
 void handle_tfs_unmount(worker_t *worker) {
-    // TODO
     int result = 0;
 
     write_pipe(worker->pipe_out, &result, sizeof(int));

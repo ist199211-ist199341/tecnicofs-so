@@ -1,6 +1,7 @@
 #ifndef COMMON_H
 #define COMMON_H
 
+#include <limits.h>
 #include <stdio.h>
 
 /* tfs_open flags */
@@ -23,6 +24,6 @@ enum {
 
 #define PIPE_STRING_LENGTH (40)
 
-#define PIPE_BUFFER_MAX_LEN (1024) // TODO
+#define PIPE_BUFFER_MAX_LEN (PIPE_BUF)
 
 #endif /* COMMON_H */

@@ -17,6 +17,11 @@
         return -1;                                                             \
     }
 
+#define ensure_packet_len_limit(len)                                           \
+    if (len > PIPE_BUFFER_MAX_LEN) {                                           \
+        return -1;                                                             \
+    }
+
 void packetcpy(void *packet, size_t *packet_offset, void const *data,
                size_t size) {
     memcpy(packet + *packet_offset, data, size);
@@ -45,6 +50,7 @@ int tfs_mount(char const *client_pipe_path, char const *server_pipe_path) {
     /* len = opcode (char) + pipename (char * PIPE_STRING_LENGTH) */
 
     size_t packet_len = sizeof(char) + sizeof(char) * PIPE_STRING_LENGTH;
+    ensure_packet_len_limit(packet_len);
     size_t packet_offset = 0;
     int8_t *packet = (int8_t *)malloc(packet_len);
     if (packet == NULL) {
@@ -80,6 +86,7 @@ int tfs_unmount() {
     /* len = opcode (char) + session_id (int) */
 
     size_t packet_len = sizeof(char) + sizeof(int);
+    ensure_packet_len_limit(packet_len);
     size_t packet_offset = 0;
     int8_t *packet = (int8_t *)malloc(packet_len);
     if (packet == NULL) {
@@ -110,6 +117,7 @@ int tfs_open(char const *name, int flags) {
 
     size_t packet_len =
         sizeof(char) + 2 * sizeof(int) + sizeof(char) * PIPE_STRING_LENGTH;
+    ensure_packet_len_limit(packet_len);
     size_t packet_offset = 0;
     int8_t *packet = (int8_t *)malloc(packet_len);
     if (packet == NULL) {
@@ -139,6 +147,7 @@ int tfs_close(int fhandle) {
     /* len = opcode (char) + session_id (int) + fhandle (int) */
 
     size_t packet_len = sizeof(char) + 2 * sizeof(int);
+    ensure_packet_len_limit(packet_len);
     size_t packet_offset = 0;
     int8_t *packet = (int8_t *)malloc(packet_len);
     if (packet == NULL) {
@@ -166,6 +175,7 @@ ssize_t tfs_write(int fhandle, void const *buffer, size_t len) {
 
     size_t packet_len =
         sizeof(char) + 2 * sizeof(int) + sizeof(size_t) + sizeof(char) * len;
+    ensure_packet_len_limit(packet_len);
     size_t packet_offset = 0;
     int8_t *packet = (int8_t *)malloc(packet_len);
     if (packet == NULL) {
@@ -194,6 +204,7 @@ ssize_t tfs_read(int fhandle, void *buffer, size_t len) {
     /* len = opcode (char) + session_id (int) + fhandle (int) + len (size_t) */
 
     size_t packet_len = sizeof(char) + 2 * sizeof(int) + sizeof(size_t);
+    ensure_packet_len_limit(packet_len);
     size_t packet_offset = 0;
     int8_t *packet = (int8_t *)malloc(packet_len);
     if (packet == NULL) {
@@ -223,6 +234,7 @@ int tfs_shutdown_after_all_closed() {
     /* len = opcode (char) + session_id (int) */
 
     size_t packet_len = sizeof(char) + sizeof(int);
+    ensure_packet_len_limit(packet_len);
     size_t packet_offset = 0;
     int8_t *packet = (int8_t *)malloc(packet_len);
     if (packet == NULL) {
