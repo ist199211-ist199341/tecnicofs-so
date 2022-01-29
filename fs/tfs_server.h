@@ -17,10 +17,16 @@ typedef struct {
     char *buffer;
 } packet_t;
 
+typedef struct {
+    char buffer[WORKER_BUFFER_LEN];
+    int to_write, to_read;
+} buffer_t;
+
 /* Represents a worker */
 typedef struct {
     int session_id;
     packet_t packet;
+    buffer_t buffer;
     int pipe_out;
     bool to_execute;
     pthread_t tid;

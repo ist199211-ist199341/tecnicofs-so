@@ -135,6 +135,8 @@ int init_server() {
     for (int i = 0; i < SIMULTANEOUS_CONNECTIONS; ++i) {
         workers[i].session_id = i;
         workers[i].to_execute = false;
+        workers[i].buffer.to_read = 0;
+        workers[i].buffer.to_write = 0;
         mutex_init(&workers[i].lock);
         if (pthread_cond_init(&workers[i].cond, NULL) != 0) {
             return -1;
