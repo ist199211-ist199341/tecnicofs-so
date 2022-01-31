@@ -19,7 +19,8 @@
         return -1;                                                             \
     }
 
-/* check if the len of the buffer is not bigger than the size of the pipe. */
+/* check if the len of the buffer is not bigger than the maximum size of an
+ * atomic write to the pipe. */
 #define ensure_packet_len_limit(len)                                           \
     if (len > PIPE_BUFFER_MAX_LEN) {                                           \
         return -1;                                                             \

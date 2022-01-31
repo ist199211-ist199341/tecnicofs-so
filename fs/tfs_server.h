@@ -42,7 +42,7 @@ int get_available_worker();
 
 /*
  * Changes the state of the worker to free.
- * Returns 0 if successful, -1 otherwise.
+ * Returns 0 if successful, -1 if worker is already free.
  */
 int free_worker(int session_id);
 
@@ -78,7 +78,8 @@ int parse_tfs_read_packet();
  */
 int wrap_packet_parser_fn(int parser_fn(worker_t *), char op_code);
 
-/* Executes the action given by the user.
+/* The worker thread main function, it waits for a signal, handles the request
+ * and waits for the next request.
  * Input:
  * - args: worker
  */
