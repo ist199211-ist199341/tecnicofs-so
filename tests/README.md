@@ -15,6 +15,8 @@ Below is a description of what each test does.
 
 ## Student Made Tests
 
+- `client_server_shutdown_test`: Open various files, then ask the server to shutdown and then close the files after a delay.
+- `client_server_simple_test`: Perform various simple operations concurrently to the server.
 - `thread_copy_to_external`: Copy various files multiple times concurrently to the external FS,
   and compare their contents with the original.
 - `thread_create_files`: Create as many files as possible, in order to test concurrency of `inode_create`.
