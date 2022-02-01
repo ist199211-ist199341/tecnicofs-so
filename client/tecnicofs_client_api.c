@@ -7,21 +7,33 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+/* check if all the content was written to the pipe. */
 #define write_pipe(pipe, buffer, size)                                         \
     if (write(pipe, buffer, size) != size) {                                   \
         return -1;                                                             \
     }
 
+/* check if all the content was read from the pipe. */
 #define read_pipe(pipe, buffer, size)                                          \
     if (read(pipe, buffer, size) != size) {                                    \
         return -1;                                                             \
     }
 
+/* check if the len of the buffer is not bigger than the maximum size of an
+ * atomic write to the pipe. */
 #define ensure_packet_len_limit(len)                                           \
     if (len > PIPE_BUFFER_MAX_LEN) {                                           \
         return -1;                                                             \
     }
 
+/*
+ * Copies the content to the packet.
+ * Input:
+ * - packet: pointer to where to store the data
+ * - packet_offset: indicates where to start writing new data
+ * - data: data to be copied
+ * - size: size of the data
+ */
 void packetcpy(void *packet, size_t *packet_offset, void const *data,
                size_t size) {
     memcpy(packet + *packet_offset, data, size);
