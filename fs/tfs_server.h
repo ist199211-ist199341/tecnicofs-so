@@ -28,6 +28,9 @@ typedef struct {
     pthread_cond_t cond;
 } worker_t;
 
+void write_pipe(int pipe, void *buffer, size_t size);
+void read_pipe(int pipe, void *buffer, size_t size);
+
 int init_server();
 
 int get_available_worker();
@@ -53,5 +56,10 @@ void read_id_and_launch_function(void fn(int));
 void *session_worker(void *args);
 
 int wrap_packet_parser_fn(int parser_fn(worker_t *), char op_code);
+
+/*
+ * Closes the server if a pipe is broken.
+ */
+void close_server_by_pipe_broken(int s);
 
 #endif

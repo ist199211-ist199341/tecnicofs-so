@@ -11,17 +11,28 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#define write_pipe(pipe, buffer, size)                                         \
-    if (write(pipe, buffer, size) != size) {                                   \
-        perror("Failed to write to pipe");                                     \
-        exit(EXIT_FAILURE);                                                    \
+void write_pipe(int pipe, void *buffer, size_t size) {
+    ssize_t bytes_written = -1;
+    while (bytes_written < 0) {
+        bytes_written = write(pipe, buffer, size);
+        if (bytes_written != size && errno != EINTR) {
+            perror("Failed to write to pipe");
+            exit(EXIT_FAILURE);
+        }
     }
+}
 
-#define read_pipe(pipe, buffer, size)                                          \
-    if (read(pipe, buffer, size) != size) {                                    \
-        perror("Failed to read from pipe");                                    \
-        exit(EXIT_FAILURE);                                                    \
+void read_pipe(int pipe, void *buffer, size_t size) {
+
+    ssize_t bytes_read = -1;
+    while (bytes_read < 0) {
+        bytes_read = read(pipe, buffer, size);
+        if (bytes_read != size && errno != EINTR) {
+            perror("Failed to read from pipe");
+            exit(EXIT_FAILURE);
+        }
     }
+}
 
 static worker_t workers[SIMULTANEOUS_CONNECTIONS];
 static bool free_workers[SIMULTANEOUS_CONNECTIONS];
@@ -38,6 +49,7 @@ int main(int argc, char **argv) {
     }
 
     signal(SIGINT, close_server_by_user);
+    signal(SIGPIPE, close_server_by_pipe_broken);
 
     if (init_server() != 0) {
         printf("Failed to init server\n");
@@ -76,6 +88,9 @@ int main(int argc, char **argv) {
         char op_code;
 
         bytes_read = read(pipe_in, &op_code, sizeof(char));
+        if (bytes_read < 0 && errno == EINTR) {
+            bytes_read = 10;
+        }
 
         // main listener loop
         while (bytes_read > 0) {
@@ -107,11 +122,18 @@ int main(int argc, char **argv) {
                 break;
             }
             bytes_read = read(pipe_in, &op_code, sizeof(char));
+            if (bytes_read < 0 && errno == EINTR) {
+                bytes_read = 10;
+            }
         }
 
-        if (bytes_read < 0) {
+        // https://stackoverflow.com/questions/41474299/checking-if-errno-eintr-what-does-it-mean
+        if (bytes_read < 0 && errno != EINTR) {
             perror("Failed to read pipe");
-            close(pipe_in);
+            if (close(pipe_in) < 0) {
+                perror("Failed to close pipe");
+                exit(EXIT_FAILURE);
+            }
             if (unlink(pipename) != 0) {
                 perror("Failed to delete pipe");
             }
@@ -190,6 +212,13 @@ int handle_tfs_mount() {
     }
 
     write_pipe(pipe_out, &session_id, sizeof(int));
+
+    if (session_id < 0) {
+        if (close(pipe_out) < 0) {
+            perror("Failed to close pipe");
+            exit(EXIT_FAILURE);
+        }
+    }
     return 0;
 }
 
@@ -350,4 +379,15 @@ int wrap_packet_parser_fn(int parser_fn(worker_t *), char op_code) {
 
     mutex_unlock(&worker->lock);
     return result;
+}
+
+void close_server_by_pipe_broken(int singnum) {
+    (void)singnum;
+
+    // todo handle session_id
+    printf("\nPipe was broken.\nClosing Server.\n");
+
+    unlink(pipename);
+
+    exit(0);
 }
