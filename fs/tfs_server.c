@@ -13,15 +13,13 @@
 /* check if all the content was written to the pipe. */
 #define write_pipe(pipe, buffer, size)                                         \
     if (write(pipe, buffer, size) != size) {                                   \
-        perror("Failed to write to pipe");                                     \
-        exit(EXIT_FAILURE);                                                    \
+        return -1;                                                             \
     }
 
 /* check if all the content was read from the pipe. */
 #define read_pipe(pipe, buffer, size)                                          \
     if (read(pipe, buffer, size) != size) {                                    \
-        perror("Failed to read from pipe");                                    \
-        exit(EXIT_FAILURE);                                                    \
+        return -1;                                                             \
     }
 
 static worker_t workers[SIMULTANEOUS_CONNECTIONS];
@@ -221,9 +219,11 @@ int parse_tfs_read_packet(worker_t *worker) {
     return 0;
 }
 
-int wrap_packet_parser_fn(int parser_fn(worker_t *), char op_code) {
+void wrap_packet_parser_fn(int parser_fn(worker_t *), char op_code) {
     int session_id;
-    read_pipe(pipe_in, &session_id, sizeof(int));
+    // TODO handle errors here manually, since we don't want to return -1 with
+    // the macro
+    read(pipe_in, &session_id, sizeof(int));
 
     worker_t *worker = &workers[session_id];
     mutex_lock(&worker->lock);
@@ -236,13 +236,21 @@ int wrap_packet_parser_fn(int parser_fn(worker_t *), char op_code) {
         result = parser_fn(worker);
     }
 
-    if (pthread_cond_signal(&worker->cond) != 0) {
-        perror("Couldn't signal worker");
-        exit(EXIT_FAILURE);
+    if (result == 0) {
+        if (pthread_cond_signal(&worker->cond) != 0) {
+            perror("Couldn't signal worker");
+            exit(EXIT_FAILURE);
+        }
+    } else {
+        /* if there is an error during the parsing of the message, discard
+         * this session */
+        if (free_worker(worker->session_id) == -1) {
+            perror("Failed to free worker");
+            exit(EXIT_FAILURE);
+        }
     }
 
     mutex_unlock(&worker->lock);
-    return result;
 }
 
 void *session_worker(void *args) {
@@ -254,29 +262,41 @@ void *session_worker(void *args) {
             pthread_cond_wait(&worker->cond, &worker->lock);
         }
 
+        int result = 0;
+
         switch (worker->packet.opcode) {
 
         case TFS_OP_CODE_UNMOUNT:
-            handle_tfs_unmount(worker);
+            result = handle_tfs_unmount(worker);
             break;
         case TFS_OP_CODE_OPEN:
-            handle_tfs_open_worker(worker);
+            result = handle_tfs_open_worker(worker);
             break;
         case TFS_OP_CODE_CLOSE:
-            handle_tfs_close(worker);
+            result = handle_tfs_close(worker);
             break;
         case TFS_OP_CODE_WRITE:
-            handle_tfs_write(worker);
+            result = handle_tfs_write(worker);
             break;
         case TFS_OP_CODE_READ:
-            handle_tfs_read(worker);
+            result = handle_tfs_read(worker);
             break;
         case TFS_OP_CODE_SHUTDOWN_AFTER_ALL_CLOSED:
-            handle_tfs_shutdown_after_all_closed(worker);
+            result = handle_tfs_shutdown_after_all_closed(worker);
             break;
         default:
             break;
         }
+
+        if (result != 0) {
+            /* if there is an error during the handling of the message, discard
+             * this session */
+            if (free_worker(worker->session_id) == -1) {
+                perror("Failed to free worker");
+                exit(EXIT_FAILURE);
+            }
+        }
+
         worker->to_execute = false;
         mutex_unlock(&worker->lock);
     }
@@ -300,7 +320,8 @@ int handle_tfs_mount() {
     write_pipe(pipe_out, &session_id, sizeof(int));
     return 0;
 }
-void handle_tfs_unmount(worker_t *worker) {
+
+int handle_tfs_unmount(worker_t *worker) {
     int result = 0;
 
     write_pipe(worker->pipe_out, &result, sizeof(int));
@@ -311,23 +332,27 @@ void handle_tfs_unmount(worker_t *worker) {
         perror("Failed to free worker");
         exit(EXIT_FAILURE);
     }
+    return 0;
 }
 
-void handle_tfs_open_worker(worker_t *worker) {
+int handle_tfs_open_worker(worker_t *worker) {
     packet_t *packet = &worker->packet;
 
     int result = tfs_open(packet->file_name, packet->flags);
     write_pipe(worker->pipe_out, &result, sizeof(int));
+    return 0;
 }
 
-void handle_tfs_close(worker_t *worker) {
+int handle_tfs_close(worker_t *worker) {
     packet_t *packet = &worker->packet;
 
     int result = tfs_close(packet->fhandle);
     write_pipe(worker->pipe_out, &result, sizeof(int));
+
+    return 0;
 }
 
-void handle_tfs_write(worker_t *worker) {
+int handle_tfs_write(worker_t *worker) {
     packet_t *packet = &worker->packet;
 
     int result = (int)tfs_write(packet->fhandle, packet->buffer, packet->len);
@@ -335,9 +360,11 @@ void handle_tfs_write(worker_t *worker) {
     write_pipe(worker->pipe_out, &result, sizeof(int));
 
     free(worker->packet.buffer);
+
+    return 0;
 }
 
-void handle_tfs_read(worker_t *worker) {
+int handle_tfs_read(worker_t *worker) {
     packet_t *packet = &worker->packet;
     char *buffer = (char *)malloc(sizeof(char) * packet->len);
 
@@ -348,13 +375,16 @@ void handle_tfs_read(worker_t *worker) {
         write_pipe(worker->pipe_out, buffer, (size_t)result * sizeof(char));
     }
     free(buffer);
+
+    return 0;
 }
 
-void handle_tfs_shutdown_after_all_closed(worker_t *worker) {
+int handle_tfs_shutdown_after_all_closed(worker_t *worker) {
     int result = tfs_destroy_after_all_closed();
     exit_server = true;
 
     write_pipe(worker->pipe_out, &result, sizeof(int));
+    return 0;
 }
 
 void close_server_by_user(int singnum) {
