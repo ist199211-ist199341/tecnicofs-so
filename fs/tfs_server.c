@@ -360,9 +360,9 @@ void handle_tfs_shutdown_after_all_closed(worker_t *worker) {
 void close_server_by_user(int singnum) {
     (void)singnum;
 
-    // todo handle session_id
     printf("\nSucessfully ended the server.\n");
 
+    close(pipe_in);
     unlink(pipename);
 
     exit(0);
