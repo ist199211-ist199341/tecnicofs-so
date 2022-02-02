@@ -178,6 +178,7 @@ int parse_tfs_open_packet(worker_t *worker) {
     read_pipe(pipe_in, &worker->packet.file_name,
               sizeof(char) * PIPE_STRING_LENGTH);
     read_pipe(pipe_in, &worker->packet.flags, sizeof(int));
+    worker->packet.file_name[PIPE_STRING_LENGTH] = '\0';
 
     return 0;
 }
@@ -267,8 +268,9 @@ void *session_worker(void *args) {
 }
 
 int handle_tfs_mount() {
-    char client_pipe_name[PIPE_STRING_LENGTH];
+    char client_pipe_name[PIPE_STRING_LENGTH + 1];
     read_pipe(pipe_in, client_pipe_name, sizeof(char) * PIPE_STRING_LENGTH);
+    client_pipe_name[PIPE_STRING_LENGTH] = '\0';
 
     int session_id = get_available_worker();
     int pipe_out = open(client_pipe_name, O_WRONLY);

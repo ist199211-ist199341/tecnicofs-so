@@ -9,8 +9,8 @@
 /* Represents a packet */
 typedef struct {
     char opcode;
-    char client_pipe[PIPE_STRING_LENGTH];
-    char file_name[PIPE_STRING_LENGTH];
+    char client_pipe[PIPE_STRING_LENGTH + 1];
+    char file_name[PIPE_STRING_LENGTH + 1];
     int flags;
     int fhandle;
     size_t len;
