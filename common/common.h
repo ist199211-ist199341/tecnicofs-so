@@ -2,7 +2,6 @@
 #define COMMON_H
 
 #include <limits.h>
-#include <stdio.h>
 
 /* tfs_open flags */
 enum {
