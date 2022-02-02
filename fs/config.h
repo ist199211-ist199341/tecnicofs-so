@@ -16,6 +16,6 @@
 #define DELAY (5000)
 
 // Number of simultaneous connections that the server can handle at a given time
-#define SIMULTANEOUS_CONNECTIONS (5)
+#define SIMULTANEOUS_CONNECTIONS (50)
 
 #endif // CONFIG_H
