@@ -87,8 +87,6 @@ void run_test(char *server_pipe, int client_id) {
     assert(strcmp(buffer, str) == 0);
 
     assert(tfs_close(f) != -1);
-
-    assert(tfs_unmount() == 0);
 }
 
 void run_close_function(char *server_pipe, int client_id) {
