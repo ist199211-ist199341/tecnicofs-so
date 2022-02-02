@@ -31,6 +31,7 @@ TARGET_EXECS += tests/thread_same_fd
 TARGET_EXECS += tests/thread_create_same_file
 #TARGET_EXECS += tests/lib_destroy_after_all_closed_test
 TARGET_EXECS += tests/client_server_simple_test
+TARGET_EXECS += tests/client_server_shutdown_test
 
 # VPATH is a variable used by Makefile which finds *sources* and makes them available throughout the codebase
 # vpath %.h <DIR> tells make to look for header files in <DIR>
@@ -105,6 +106,7 @@ tests/thread_same_fd: tests/thread_same_fd.o fs/operations.o fs/state.o fs/utils
 tests/thread_create_same_file: tests/thread_create_same_file.o fs/operations.o fs/state.o fs/utils.o
 tests/block_destroy_simple: tests/block_destroy_simple.o fs/operations.o fs/state.o fs/utils.o
 tests/client_server_simple_test: tests/client_server_simple_test.o client/tecnicofs_client_api.o fs/utils.o
+tests/client_server_shutdown_test: tests/client_server_shutdown_test.o client/tecnicofs_client_api.o fs/utils.o
 tests/lib_destroy_after_all_closed_test: fs/operations.o fs/state.o fs/utils.o
 
 clean:

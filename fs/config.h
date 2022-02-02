@@ -15,7 +15,7 @@
 
 #define DELAY (5000)
 
-#define SIMULTANEOUS_CONNECTIONS (5)
-#define WORKER_BUFFER_LEN (1024)
+// Number of simultaneous connections that the server can handle at a given time
+#define SIMULTANEOUS_CONNECTIONS (50)
 
 #endif // CONFIG_H

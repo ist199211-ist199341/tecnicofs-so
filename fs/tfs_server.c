@@ -6,11 +6,11 @@
 #include <pthread.h>
 #include <signal.h>
 #include <stdbool.h>
-#include <stdint.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
+/* check if all the content was written to the pipe. */
 void write_pipe(int pipe, void *buffer, size_t size) {
     ssize_t bytes_written = -1;
     while (bytes_written < 0) {
@@ -22,6 +22,7 @@ void write_pipe(int pipe, void *buffer, size_t size) {
     }
 }
 
+/* check if all the content was read from the pipe. */
 void read_pipe(int pipe, void *buffer, size_t size) {
 
     ssize_t bytes_read = -1;
@@ -37,6 +38,7 @@ void read_pipe(int pipe, void *buffer, size_t size) {
 static worker_t workers[SIMULTANEOUS_CONNECTIONS];
 static bool free_workers[SIMULTANEOUS_CONNECTIONS];
 static pthread_mutex_t free_worker_lock;
+static bool exit_server = false;
 
 static int pipe_in;
 
@@ -74,13 +76,26 @@ int main(int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
 
-    bool exit_server = false;
+    pipe_in = open(pipename, O_RDONLY);
+    if (pipe_in < 0) {
+        perror("Failed to open server pipe");
+        unlink(pipename);
+        exit(EXIT_FAILURE);
+    }
 
     while (!exit_server) {
-        pipe_in = open(pipename, O_RDONLY);
-        if (pipe_in < 0) {
+        /* Open and close a dummy pipe to avoid having active wait for another
+         * process to open the pipe. The 'open' function blocks until the pipe
+         * is openned on the other side, therefore doing exactly what we want.
+         */
+        int tmp_pipe = open(pipename, O_RDONLY);
+        if (tmp_pipe < 0) {
             perror("Failed to open server pipe");
             unlink(pipename);
+            exit(EXIT_FAILURE);
+        }
+        if (close(tmp_pipe) < 0) {
+            perror("Failed to close pipe");
             exit(EXIT_FAILURE);
         }
 
@@ -116,7 +131,6 @@ int main(int argc, char **argv) {
                 break;
             case TFS_OP_CODE_SHUTDOWN_AFTER_ALL_CLOSED:
                 wrap_packet_parser_fn(NULL, op_code);
-                exit_server = true;
                 break;
             default:
                 break;
@@ -139,10 +153,10 @@ int main(int argc, char **argv) {
             }
             exit(EXIT_FAILURE);
         }
-        if (close(pipe_in) < 0) {
-            perror("Failed to close pipe");
-            exit(EXIT_FAILURE);
-        }
+    }
+    if (close(pipe_in) < 0) {
+        perror("Failed to close pipe");
+        exit(EXIT_FAILURE);
     }
 
     if (unlink(pipename) != 0) {
@@ -197,35 +211,11 @@ int free_worker(int session_id) {
     return 0;
 }
 
-int handle_tfs_mount() {
-    char client_pipe_name[PIPE_STRING_LENGTH];
-    read_pipe(pipe_in, client_pipe_name, sizeof(char) * PIPE_STRING_LENGTH);
-
-    int session_id = get_available_worker();
-    int pipe_out = open(client_pipe_name, O_WRONLY);
-
-    if (session_id < 0) {
-        printf("The number of sessions was exceeded.\n");
-    } else {
-        printf("The session number %d was created with success.\n", session_id);
-        workers[session_id].pipe_out = pipe_out;
-    }
-
-    write_pipe(pipe_out, &session_id, sizeof(int));
-
-    if (session_id < 0) {
-        if (close(pipe_out) < 0) {
-            perror("Failed to close pipe");
-            exit(EXIT_FAILURE);
-        }
-    }
-    return 0;
-}
-
 int parse_tfs_open_packet(worker_t *worker) {
     read_pipe(pipe_in, &worker->packet.file_name,
               sizeof(char) * PIPE_STRING_LENGTH);
     read_pipe(pipe_in, &worker->packet.flags, sizeof(int));
+    worker->packet.file_name[PIPE_STRING_LENGTH] = '\0';
 
     return 0;
 }
@@ -253,15 +243,28 @@ int parse_tfs_read_packet(worker_t *worker) {
     return 0;
 }
 
-void close_server_by_user(int singnum) {
-    (void)singnum;
+int wrap_packet_parser_fn(int parser_fn(worker_t *), char op_code) {
+    int session_id;
+    read_pipe(pipe_in, &session_id, sizeof(int));
 
-    // todo handle session_id
-    printf("\nSucessfully ended the server.\n");
+    worker_t *worker = &workers[session_id];
+    mutex_lock(&worker->lock);
+    worker->packet.opcode = op_code;
 
-    unlink(pipename);
+    worker->to_execute = true;
 
-    exit(0);
+    int result = 0;
+    if (parser_fn != NULL) {
+        result = parser_fn(worker);
+    }
+
+    if (pthread_cond_signal(&worker->cond) != 0) {
+        perror("Couldn't signal worker");
+        exit(EXIT_FAILURE);
+    }
+
+    mutex_unlock(&worker->lock);
+    return result;
 }
 
 void *session_worker(void *args) {
@@ -301,6 +304,31 @@ void *session_worker(void *args) {
     }
 }
 
+int handle_tfs_mount() {
+    char client_pipe_name[PIPE_STRING_LENGTH + 1];
+    read_pipe(pipe_in, client_pipe_name, sizeof(char) * PIPE_STRING_LENGTH);
+    client_pipe_name[PIPE_STRING_LENGTH] = '\0';
+
+    int session_id = get_available_worker();
+    int pipe_out = open(client_pipe_name, O_WRONLY);
+
+    if (session_id < 0) {
+        printf("The number of sessions was exceeded.\n");
+    } else {
+        printf("The session number %d was created with success.\n", session_id);
+        workers[session_id].pipe_out = pipe_out;
+    }
+
+    write_pipe(pipe_out, &session_id, sizeof(int));
+
+    if (session_id < 0) {
+        if (close(pipe_out) < 0) {
+            perror("Failed to close pipe");
+            exit(EXIT_FAILURE);
+        }
+    }
+    return 0;
+}
 void handle_tfs_unmount(worker_t *worker) {
     int result = 0;
 
@@ -353,41 +381,38 @@ void handle_tfs_read(worker_t *worker) {
 
 void handle_tfs_shutdown_after_all_closed(worker_t *worker) {
     int result = tfs_destroy_after_all_closed();
+    exit_server = true;
 
     write_pipe(worker->pipe_out, &result, sizeof(int));
 }
 
-int wrap_packet_parser_fn(int parser_fn(worker_t *), char op_code) {
-    int session_id;
-    read_pipe(pipe_in, &session_id, sizeof(int));
+void close_server_by_user(int singnum) {
+    (void)singnum;
 
-    worker_t *worker = &workers[session_id];
-    mutex_lock(&worker->lock);
-    worker->packet.opcode = op_code;
+    printf("\nSucessfully ended the server.\n");
 
-    worker->to_execute = true;
-
-    int result = 0;
-    if (parser_fn != NULL) {
-        result = parser_fn(worker);
-    }
-
-    if (pthread_cond_signal(&worker->cond) != 0) {
-        perror("Couldn't signal worker");
+    if (close(pipe_in) < 0) {
+        perror("Failed to close pipe");
         exit(EXIT_FAILURE);
     }
 
-    mutex_unlock(&worker->lock);
-    return result;
+    if (unlink(pipename) != 0) {
+        perror("Failed to delete pipe");
+        exit(EXIT_FAILURE);
+    }
+
+    exit(0);
 }
 
 void close_server_by_pipe_broken(int singnum) {
     (void)singnum;
 
-    // todo handle session_id
-    printf("\nPipe was broken.\nClosing Server.\n");
+    printf("\nA pipe was broken.\n Shutting down the server.\n");
 
-    unlink(pipename);
+    if (unlink(pipename) != 0) {
+        perror("Failed to delete pipe");
+        exit(EXIT_FAILURE);
+    }
 
     exit(0);
 }

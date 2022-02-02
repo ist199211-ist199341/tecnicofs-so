@@ -7,21 +7,33 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+/* check if all the content was written to the pipe. */
 #define write_pipe(pipe, buffer, size)                                         \
     if (write(pipe, buffer, size) != size) {                                   \
         return -1;                                                             \
     }
 
+/* check if all the content was read from the pipe. */
 #define read_pipe(pipe, buffer, size)                                          \
     if (read(pipe, buffer, size) != size) {                                    \
         return -1;                                                             \
     }
 
+/* check if the len of the buffer is not bigger than the maximum size of an
+ * atomic write to the pipe. */
 #define ensure_packet_len_limit(len)                                           \
     if (len > PIPE_BUFFER_MAX_LEN) {                                           \
         return -1;                                                             \
     }
 
+/*
+ * Copies the content to the packet.
+ * Input:
+ * - packet: pointer to where to store the data
+ * - packet_offset: indicates where to start writing new data
+ * - data: data to be copied
+ * - size: size of the data
+ */
 void packetcpy(void *packet, size_t *packet_offset, void const *data,
                size_t size) {
     memcpy(packet + *packet_offset, data, size);
@@ -32,10 +44,10 @@ static int pipe_in;
 static int pipe_out;
 static int session_id;
 
-static char pipename[PIPE_STRING_LENGTH] = {0};
+static char pipename[PIPE_STRING_LENGTH + 1] = {0};
 
 int tfs_mount(char const *client_pipe_path, char const *server_pipe_path) {
-    strcpy(pipename, client_pipe_path);
+    strncpy(pipename, client_pipe_path, PIPE_STRING_LENGTH);
     unlink(pipename);
 
     if (mkfifo(pipename, 0777) < 0) {
@@ -125,8 +137,8 @@ int tfs_open(char const *name, int flags) {
     }
 
     char op_code = TFS_OP_CODE_OPEN;
-    char file_name[PIPE_STRING_LENGTH] = {0};
-    strcpy(file_name, name);
+    char file_name[PIPE_STRING_LENGTH + 1] = {0};
+    strncpy(file_name, name, PIPE_STRING_LENGTH);
 
     packetcpy(packet, &packet_offset, &op_code, sizeof(char));
     packetcpy(packet, &packet_offset, &session_id, sizeof(int));
