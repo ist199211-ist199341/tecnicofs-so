@@ -27,6 +27,7 @@
 static worker_t workers[SIMULTANEOUS_CONNECTIONS];
 static bool free_workers[SIMULTANEOUS_CONNECTIONS];
 static pthread_mutex_t free_worker_lock;
+static bool exit_server = false;
 
 static int pipe_in;
 
@@ -62,8 +63,6 @@ int main(int argc, char **argv) {
         perror("Failed to create pipe");
         exit(EXIT_FAILURE);
     }
-
-    bool exit_server = false;
 
     while (!exit_server) {
         pipe_in = open(pipename, O_RDONLY);
@@ -102,7 +101,6 @@ int main(int argc, char **argv) {
                 break;
             case TFS_OP_CODE_SHUTDOWN_AFTER_ALL_CLOSED:
                 wrap_packet_parser_fn(NULL, op_code);
-                exit_server = true;
                 break;
             default:
                 break;
@@ -337,6 +335,7 @@ void handle_tfs_read(worker_t *worker) {
 
 void handle_tfs_shutdown_after_all_closed(worker_t *worker) {
     int result = tfs_destroy_after_all_closed();
+    exit_server = true;
 
     write_pipe(worker->pipe_out, &result, sizeof(int));
 }
