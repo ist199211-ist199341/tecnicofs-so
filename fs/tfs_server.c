@@ -64,11 +64,26 @@ int main(int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
 
+    pipe_in = open(pipename, O_RDONLY);
+    if (pipe_in < 0) {
+        perror("Failed to open server pipe");
+        unlink(pipename);
+        exit(EXIT_FAILURE);
+    }
+
     while (!exit_server) {
-        pipe_in = open(pipename, O_RDONLY);
-        if (pipe_in < 0) {
+        /* Open and close a dummy pipe to avoid having active wait for another
+         * process to open the pipe. The 'open' function blocks until the pipe
+         * is openned on the other side, therefore doing exactly what we want.
+         */
+        int tmp_pipe = open(pipename, O_RDONLY);
+        if (tmp_pipe < 0) {
             perror("Failed to open server pipe");
             unlink(pipename);
+            exit(EXIT_FAILURE);
+        }
+        if (close(tmp_pipe) < 0) {
+            perror("Failed to close pipe");
             exit(EXIT_FAILURE);
         }
 
@@ -116,10 +131,10 @@ int main(int argc, char **argv) {
             }
             exit(EXIT_FAILURE);
         }
-        if (close(pipe_in) < 0) {
-            perror("Failed to close pipe");
-            exit(EXIT_FAILURE);
-        }
+    }
+    if (close(pipe_in) < 0) {
+        perror("Failed to close pipe");
+        exit(EXIT_FAILURE);
     }
 
     if (unlink(pipename) != 0) {
