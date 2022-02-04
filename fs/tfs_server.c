@@ -65,6 +65,10 @@ int main(int argc, char **argv) {
          */
         int tmp_pipe = open(pipename, O_RDONLY);
         if (tmp_pipe < 0) {
+            if (errno == ENOENT) {
+                /* if pipe does not exist, means we've exited */
+                return 0;
+            }
             perror("Failed to open server pipe");
             close_server(EXIT_FAILURE);
         }
@@ -390,7 +394,13 @@ int handle_tfs_shutdown_after_all_closed(worker_t *worker) {
     int result = tfs_destroy_after_all_closed();
     write_pipe(worker->pipe_out, &result, sizeof(int));
 
-    close_server(EXIT_SUCCESS);
+    if (unlink(pipename) != 0 && errno != ENOENT) {
+        perror("Failed to delete pipe");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("\nSuccessfully ended the server, as requested by client.\n");
+    exit(EXIT_SUCCESS);
 
     return 0;
 }
@@ -406,7 +416,7 @@ void close_server(int status) {
         exit(EXIT_FAILURE);
     }
 
-    if (unlink(pipename) != 0) {
+    if (unlink(pipename) != 0 && errno != ENOENT) {
         perror("Failed to delete pipe");
         exit(EXIT_FAILURE);
     }
