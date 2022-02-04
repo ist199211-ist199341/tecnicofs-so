@@ -207,7 +207,7 @@ void wrap_packet_parser_fn(int parser_fn(worker_t *), char op_code) {
         perror("Could not read from server pipe");
         close_server(EXIT_FAILURE);
     }
-    if (session_id < 0 || session_id > SIMULTANEOUS_CONNECTIONS) {
+    if (session_id < 0 || session_id >= SIMULTANEOUS_CONNECTIONS) {
         fprintf(stderr, "session_id %d is invalid when parsing packet\n",
                 session_id);
         close_server(EXIT_FAILURE);
@@ -217,14 +217,13 @@ void wrap_packet_parser_fn(int parser_fn(worker_t *), char op_code) {
     mutex_lock(&worker->lock);
     worker->packet.opcode = op_code;
 
-    worker->to_execute = true;
-
     int result = 0;
     if (parser_fn != NULL) {
         result = parser_fn(worker);
     }
 
     if (result == 0) {
+        worker->to_execute = true;
         if (pthread_cond_signal(&worker->cond) != 0) {
             perror("Couldn't signal worker");
             close_server(EXIT_FAILURE);
