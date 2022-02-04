@@ -1,5 +1,6 @@
 tecnicofs_client_api.o: client/tecnicofs_client_api.c \
  client/tecnicofs_client_api.h common/common.h
+common.o: common/common.c
 operations.o: fs/operations.c fs/operations.h common/common.h fs/config.h \
  fs/state.h fs/utils.h
 state.o: fs/state.c fs/state.h fs/config.h fs/utils.h
@@ -11,6 +12,8 @@ block_destroy_simple.o: tests/block_destroy_simple.c fs/operations.h \
 client_server_shutdown_test.o: tests/client_server_shutdown_test.c \
  client/tecnicofs_client_api.h common/common.h
 client_server_simple_test.o: tests/client_server_simple_test.c \
+ client/tecnicofs_client_api.h common/common.h
+client_server_trunc_append.o: tests/client_server_trunc_append.c \
  client/tecnicofs_client_api.h common/common.h
 copy_to_external_errors.o: tests/copy_to_external_errors.c \
  fs/operations.h common/common.h fs/config.h fs/state.h

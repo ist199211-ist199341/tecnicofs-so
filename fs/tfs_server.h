@@ -71,7 +71,8 @@ int parse_tfs_write_packet();
  */
 int parse_tfs_read_packet();
 
-/* Given the opcode, it executes the associated parser function.
+/*
+ * Given the opcode, it executes the associated parser function.
  * Input:
  * - parser_fn: function to be executed
  * - op_code: op_code of the function to be used
@@ -79,49 +80,57 @@ int parse_tfs_read_packet();
  */
 void wrap_packet_parser_fn(int parser_fn(worker_t *), char op_code);
 
-/* The worker thread main function, it waits for a signal, handles the request
+/*
+ * The worker thread main function, it waits for a signal, handles the request
  * and waits for the next request.
  * Input:
  * - args: worker
  */
 void *session_worker(void *args);
 
-/* Mounts the client to the server
- * Returns 0.
+/*
+ * Mounts the client to the server.
+ * Returns 0 if successful, -1 otherwise.
  */
 int handle_tfs_mount();
 
-/* Unmounts the client of the server
+/*
+ * Unmounts the client of the server.
  * Input:
- * - worker:  worker that is going to handle the function
+ * - worker: worker that is going to handle the function
  */
 int handle_tfs_unmount(worker_t *worker);
 
-/* Executes tfs_open
+/*
+ * Executes tfs_open.
  * Input:
- * - worker:  worker that is going to handle the function
+ * - worker: worker that is going to handle the function
  */
-int handle_tfs_open_worker(worker_t *worker);
+int handle_tfs_open(worker_t *worker);
 
-/* Executes tfs_write
+/*
+ * Executes tfs_write.
  * Input:
  * - worker: worker that is going to handle the function
  */
 int handle_tfs_write(worker_t *worker);
 
-/* Executes tfs_read
+/*
+ * Executes tfs_read.
  * Input:
  * - worker: worker that is going to handle the function
  */
 int handle_tfs_read(worker_t *worker);
 
-/* Executes tfs_close
+/*
+ * Executes tfs_close.
  * Input:
  * - worker: worker that is going to handle the function
  */
 int handle_tfs_close(worker_t *worker);
 
-/* Executes tfs_shutdown
+/*
+ * Executes tfs_tfs_destroy_after_all_closed and closes the server.
  * Input:
  * - worker: worker that is going to handle the function
  */
@@ -131,21 +140,11 @@ int handle_tfs_shutdown_after_all_closed(worker_t *worker);
  * Handles the SIGINT signal.
  * Closes the server.
  */
-void close_server_by_user(int s);
+void close_server_by_user(int singnum);
 
 /*
- * Close and unlink server pipe and then exit the program with the given status
+ * Close and unlink server pipe and then exit the program with the given status.
  */
 void close_server(int status);
-
-/*
- * Same as POSIX's read, but handles EINTR correctly.
- */
-ssize_t try_read(int fd, void *buf, size_t count);
-
-/*
- * Same as POSIX's write, but handles EINTR correctly.
- */
-ssize_t try_write(int fd, const void *buf, size_t count);
 
 #endif

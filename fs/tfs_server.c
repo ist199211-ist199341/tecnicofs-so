@@ -1,4 +1,5 @@
 #include "tfs_server.h"
+#include "common/common.h"
 #include "operations.h"
 #include "utils.h"
 #include <errno.h>
@@ -9,18 +10,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-
-/* check if all the content was written to the pipe. */
-#define write_pipe(pipe, buffer, size)                                         \
-    if (try_write(pipe, buffer, size) != size) {                               \
-        return -1;                                                             \
-    }
-
-/* check if all the content was read from the pipe. */
-#define read_pipe(pipe, buffer, size)                                          \
-    if (try_read(pipe, buffer, size) != size) {                                \
-        return -1;                                                             \
-    }
 
 static worker_t workers[SIMULTANEOUS_CONNECTIONS];
 static bool free_workers[SIMULTANEOUS_CONNECTIONS];
@@ -94,7 +83,9 @@ int main(int argc, char **argv) {
 
             switch (op_code) {
             case TFS_OP_CODE_MOUNT:
-                handle_tfs_mount();
+                if (handle_tfs_mount() != 0) {
+                    fprintf(stderr, "Failed to mount client\n");
+                }
                 break;
             case TFS_OP_CODE_UNMOUNT:
                 wrap_packet_parser_fn(NULL, op_code);
@@ -158,7 +149,7 @@ int get_available_worker() {
         }
     }
     mutex_unlock(&free_worker_lock);
-    printf("ALL workers are full\n");
+    printf("All workers are full\n");
     return -1;
 }
 
@@ -267,7 +258,7 @@ void *session_worker(void *args) {
             result = handle_tfs_unmount(worker);
             break;
         case TFS_OP_CODE_OPEN:
-            result = handle_tfs_open_worker(worker);
+            result = handle_tfs_open(worker);
             break;
         case TFS_OP_CODE_CLOSE:
             result = handle_tfs_close(worker);
@@ -306,6 +297,10 @@ int handle_tfs_mount() {
 
     int session_id = get_available_worker();
     int pipe_out = open(client_pipe_name, O_WRONLY);
+    if (pipe_out < 0) {
+        perror("Failed to open pipe");
+        return -1;
+    }
 
     if (session_id < 0) {
         printf("The number of sessions was exceeded.\n");
@@ -321,6 +316,7 @@ int handle_tfs_mount() {
         if (close(pipe_out) < 0) {
             perror("Failed to close pipe");
         }
+        return -1;
     }
     return 0;
 }
@@ -344,7 +340,7 @@ int handle_tfs_unmount(worker_t *worker) {
     return 0;
 }
 
-int handle_tfs_open_worker(worker_t *worker) {
+int handle_tfs_open(worker_t *worker) {
     packet_t *packet = &worker->packet;
 
     int result = tfs_open(packet->file_name, packet->flags);
@@ -418,20 +414,4 @@ void close_server(int status) {
 
     printf("\nSuccessfully ended the server.\n");
     exit(status);
-}
-
-ssize_t try_read(int fd, void *buf, size_t count) {
-    ssize_t bytes_read;
-    do {
-        bytes_read = read(fd, buf, count);
-    } while (bytes_read < 0 && errno == EINTR);
-    return bytes_read;
-}
-
-ssize_t try_write(int fd, const void *buf, size_t count) {
-    ssize_t bytes_written;
-    do {
-        bytes_written = write(fd, buf, count);
-    } while (bytes_written < 0 && errno == EINTR);
-    return bytes_written;
 }
