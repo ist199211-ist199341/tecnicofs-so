@@ -76,7 +76,7 @@ int parse_tfs_read_packet();
  * - op_code: op_code of the function to be used
  * Returns the result of the parser function.
  */
-int wrap_packet_parser_fn(int parser_fn(worker_t *), char op_code);
+void wrap_packet_parser_fn(int parser_fn(worker_t *), char op_code);
 
 /* The worker thread main function, it waits for a signal, handles the request
  * and waits for the next request.
@@ -94,37 +94,37 @@ int handle_tfs_mount();
  * Input:
  * - worker:  worker that is going to handle the function
  */
-void handle_tfs_unmount(worker_t *worker);
+int handle_tfs_unmount(worker_t *worker);
 
 /* Executes tfs_open
  * Input:
  * - worker:  worker that is going to handle the function
  */
-void handle_tfs_open_worker(worker_t *worker);
+int handle_tfs_open_worker(worker_t *worker);
 
 /* Executes tfs_write
  * Input:
  * - worker: worker that is going to handle the function
  */
-void handle_tfs_write(worker_t *worker);
+int handle_tfs_write(worker_t *worker);
 
 /* Executes tfs_read
  * Input:
  * - worker: worker that is going to handle the function
  */
-void handle_tfs_read(worker_t *worker);
+int handle_tfs_read(worker_t *worker);
 
 /* Executes tfs_close
  * Input:
  * - worker: worker that is going to handle the function
  */
-void handle_tfs_close(worker_t *worker);
+int handle_tfs_close(worker_t *worker);
 
 /* Executes tfs_shutdown
  * Input:
  * - worker: worker that is going to handle the function
  */
-void handle_tfs_shutdown_after_all_closed(worker_t *worker);
+int handle_tfs_shutdown_after_all_closed(worker_t *worker);
 
 /*
  * Handles the SIGINT signal.

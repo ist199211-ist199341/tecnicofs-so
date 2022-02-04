@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
 
     run_close_function(argv[1], 0);
 
-    for (int i = 0; i < CLIENT_COUNT; ++i) {
+    for (int i = 1; i < CLIENT_COUNT; ++i) {
         int result;
         waitpid(child_pids[i], &result, 0);
         assert(WIFEXITED(result));
