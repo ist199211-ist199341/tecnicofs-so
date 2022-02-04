@@ -44,6 +44,7 @@ int tfs_mount(char const *client_pipe_path, char const *server_pipe_path) {
 
     pipe_out = open(server_pipe_path, O_WRONLY);
     if (pipe_out < 0) {
+        unlink(pipename);
         return -1;
     }
 
@@ -54,6 +55,8 @@ int tfs_mount(char const *client_pipe_path, char const *server_pipe_path) {
     size_t packet_offset = 0;
     int8_t *packet = (int8_t *)malloc(packet_len);
     if (packet == NULL) {
+        close(pipe_out);
+        unlink(pipename);
         return -1;
     }
 
@@ -68,12 +71,15 @@ int tfs_mount(char const *client_pipe_path, char const *server_pipe_path) {
 
     pipe_in = open(client_pipe_path, O_RDONLY);
     if (pipe_in < 0) {
+        close(pipe_out);
+        unlink(pipename);
         return -1;
     }
 
     read_pipe(pipe_in, &session_id, sizeof(int));
 
     if (session_id == -1) {
+        close(pipe_out);
         close(pipe_in);
         unlink(pipename);
         return -1;
@@ -104,10 +110,15 @@ int tfs_unmount() {
     int return_value;
     read_pipe(pipe_in, &return_value, sizeof(int));
 
-    close(pipe_out);
-    close(pipe_in);
+    if (close(pipe_out) < 0)
+        return -1;
+    if (close(pipe_in) < 0)
+        return -1;
 
-    unlink(pipename);
+    if (unlink(pipename) < 0)
+        return -1;
+
+    session_id = NULL;
 
     return return_value;
 }
