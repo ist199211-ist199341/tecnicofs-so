@@ -147,7 +147,7 @@ int get_available_worker() {
         }
     }
     mutex_unlock(&free_worker_lock);
-    printf("ALL workers are full\n");
+    printf("All workers are full\n");
     return -1;
 }
 
@@ -295,6 +295,10 @@ int handle_tfs_mount() {
 
     int session_id = get_available_worker();
     int pipe_out = open(client_pipe_name, O_WRONLY);
+    if (pipe_out < 0) {
+        perror("Failed to open pipe");
+        return 0;
+    }
 
     if (session_id < 0) {
         printf("The number of sessions was exceeded.\n");
