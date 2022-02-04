@@ -250,7 +250,10 @@ void *session_worker(void *args) {
         mutex_lock(&worker->lock);
 
         while (!worker->to_execute) {
-            pthread_cond_wait(&worker->cond, &worker->lock);
+            if (pthread_cond_wait(&worker->cond, &worker->lock) != 0) {
+                perror("Failed to wait for condition variable");
+                close_server(EXIT_FAILURE);
+            }
         }
 
         int result = 0;
