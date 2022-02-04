@@ -426,8 +426,6 @@ int handle_tfs_shutdown_after_all_closed(worker_t *worker) {
 void close_server_by_user(int singnum) {
     (void)singnum;
 
-    printf("\nSucessfully ended the server.\n");
-
     if (close(pipe_in) < 0) {
         perror("Failed to close pipe");
         exit(EXIT_FAILURE);
@@ -438,6 +436,7 @@ void close_server_by_user(int singnum) {
         exit(EXIT_FAILURE);
     }
 
+    printf("\nSucessfully ended the server.\n");
     exit(0);
 }
 
