@@ -138,14 +138,4 @@ void close_server_by_user(int s);
  */
 void close_server(int status);
 
-/*
- * Same as POSIX's read, but handles EINTR correctly.
- */
-ssize_t try_read(int fd, void *buf, size_t count);
-
-/*
- * Same as POSIX's write, but handles EINTR correctly.
- */
-ssize_t try_write(int fd, const void *buf, size_t count);
-
 #endif

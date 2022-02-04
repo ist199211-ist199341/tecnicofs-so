@@ -1,4 +1,5 @@
 #include "tfs_server.h"
+#include "common/common.h"
 #include "operations.h"
 #include "utils.h"
 #include <errno.h>
@@ -9,18 +10,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-
-/* check if all the content was written to the pipe. */
-#define write_pipe(pipe, buffer, size)                                         \
-    if (try_write(pipe, buffer, size) != size) {                               \
-        return -1;                                                             \
-    }
-
-/* check if all the content was read from the pipe. */
-#define read_pipe(pipe, buffer, size)                                          \
-    if (try_read(pipe, buffer, size) != size) {                                \
-        return -1;                                                             \
-    }
 
 static worker_t workers[SIMULTANEOUS_CONNECTIONS];
 static bool free_workers[SIMULTANEOUS_CONNECTIONS];
@@ -418,20 +407,4 @@ void close_server(int status) {
 
     printf("\nSuccessfully ended the server.\n");
     exit(status);
-}
-
-ssize_t try_read(int fd, void *buf, size_t count) {
-    ssize_t bytes_read;
-    do {
-        bytes_read = read(fd, buf, count);
-    } while (bytes_read < 0 && errno == EINTR);
-    return bytes_read;
-}
-
-ssize_t try_write(int fd, const void *buf, size_t count) {
-    ssize_t bytes_written;
-    do {
-        bytes_written = write(fd, buf, count);
-    } while (bytes_written < 0 && errno == EINTR);
-    return bytes_written;
 }

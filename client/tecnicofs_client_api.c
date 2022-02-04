@@ -7,18 +7,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-/* check if all the content was written to the pipe. */
-#define write_pipe(pipe, buffer, size)                                         \
-    if (write(pipe, buffer, size) != size) {                                   \
-        return -1;                                                             \
-    }
-
-/* check if all the content was read from the pipe. */
-#define read_pipe(pipe, buffer, size)                                          \
-    if (read(pipe, buffer, size) != size) {                                    \
-        return -1;                                                             \
-    }
-
 /* check if the len of the buffer is not bigger than the maximum size of an
  * atomic write to the pipe. */
 #define ensure_packet_len_limit(len)                                           \

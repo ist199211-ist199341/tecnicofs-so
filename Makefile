@@ -90,7 +90,7 @@ fmt: $(SOURCES) $(HEADERS)
 # make uses a set of default rules, one of which compiles C binaries
 # the CC, LD, CFLAGS and LDFLAGS are used in this rule
 
-fs/tfs_server: fs/operations.o fs/state.o fs/utils.o
+fs/tfs_server: fs/operations.o fs/state.o fs/utils.o common/common.o
 tests/test1: tests/test1.o fs/operations.o fs/state.o fs/utils.o
 tests/copy_to_external_errors: tests/copy_to_external_errors.o fs/operations.o fs/state.o fs/utils.o
 tests/copy_to_external_simple: tests/copy_to_external_simple.o fs/operations.o fs/state.o fs/utils.o
@@ -106,9 +106,9 @@ tests/thread_copy_to_external: tests/thread_copy_to_external.o fs/operations.o f
 tests/thread_same_fd: tests/thread_same_fd.o fs/operations.o fs/state.o fs/utils.o
 tests/thread_create_same_file: tests/thread_create_same_file.o fs/operations.o fs/state.o fs/utils.o
 tests/block_destroy_simple: tests/block_destroy_simple.o fs/operations.o fs/state.o fs/utils.o
-tests/client_server_simple_test: tests/client_server_simple_test.o client/tecnicofs_client_api.o fs/utils.o
-tests/client_server_shutdown_test: tests/client_server_shutdown_test.o client/tecnicofs_client_api.o fs/utils.o
-tests/client_server_trunc_append: tests/client_server_trunc_append.o client/tecnicofs_client_api.o fs/utils.o
+tests/client_server_simple_test: tests/client_server_simple_test.o client/tecnicofs_client_api.o fs/utils.o common/common.o
+tests/client_server_shutdown_test: tests/client_server_shutdown_test.o client/tecnicofs_client_api.o fs/utils.o common/common.o
+tests/client_server_trunc_append: tests/client_server_trunc_append.o client/tecnicofs_client_api.o fs/utils.o common/common.o
 tests/lib_destroy_after_all_closed_test: fs/operations.o fs/state.o fs/utils.o
 
 clean:
