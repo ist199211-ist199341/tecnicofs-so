@@ -118,7 +118,7 @@ int tfs_unmount() {
     if (unlink(pipename) < 0)
         return -1;
 
-    session_id = NULL;
+    session_id = -1;
 
     return return_value;
 }
