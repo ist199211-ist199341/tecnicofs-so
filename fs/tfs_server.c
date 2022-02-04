@@ -216,6 +216,11 @@ int parse_tfs_write_packet(worker_t *worker) {
     read_pipe(pipe_in, &worker->packet.fhandle, sizeof(int));
     read_pipe(pipe_in, &worker->packet.len, sizeof(size_t));
     char *buffer = (char *)malloc(worker->packet.len * sizeof(char));
+
+    if (buffer == NULL) {
+        exit(EXIT_FAILURE);
+    }
+
     read_pipe(pipe_in, buffer, worker->packet.len * sizeof(char));
     worker->packet.buffer = buffer;
 
@@ -349,7 +354,10 @@ int handle_tfs_unmount(worker_t *worker) {
 
     write_pipe(worker->pipe_out, &result, sizeof(int));
 
-    close(worker->pipe_out);
+    if (close(worker->pipe_out) < 0) {
+        perror("Failed to close pipe");
+        exit(EXIT_FAILURE);
+    }
 
     if (free_worker(worker->session_id) == -1) {
         perror("Failed to free worker");
@@ -379,7 +387,6 @@ int handle_tfs_write(worker_t *worker) {
     packet_t *packet = &worker->packet;
 
     int result = (int)tfs_write(packet->fhandle, packet->buffer, packet->len);
-    fflush(stdout);
     write_pipe(worker->pipe_out, &result, sizeof(int));
 
     free(worker->packet.buffer);
@@ -391,9 +398,14 @@ int handle_tfs_read(worker_t *worker) {
     packet_t *packet = &worker->packet;
     char *buffer = (char *)malloc(sizeof(char) * packet->len);
 
+    if (buffer == NULL) {
+        exit(EXIT_FAILURE);
+    }
+
     int result = (int)tfs_read(packet->fhandle, buffer, packet->len);
 
     write_pipe(worker->pipe_out, &result, sizeof(int));
+
     if (result > 0) {
         write_pipe(worker->pipe_out, buffer, (size_t)result * sizeof(char));
     }
@@ -404,9 +416,10 @@ int handle_tfs_read(worker_t *worker) {
 
 int handle_tfs_shutdown_after_all_closed(worker_t *worker) {
     int result = tfs_destroy_after_all_closed();
+    write_pipe(worker->pipe_out, &result, sizeof(int));
+
     exit_server = true;
 
-    write_pipe(worker->pipe_out, &result, sizeof(int));
     return 0;
 }
 
