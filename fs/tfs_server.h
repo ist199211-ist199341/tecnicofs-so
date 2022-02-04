@@ -90,7 +90,7 @@ void *session_worker(void *args);
 
 /*
  * Mounts the client to the server.
- * Returns 0.
+ * Returns 0 if successful, -1 otherwise.
  */
 int handle_tfs_mount();
 

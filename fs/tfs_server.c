@@ -83,7 +83,9 @@ int main(int argc, char **argv) {
 
             switch (op_code) {
             case TFS_OP_CODE_MOUNT:
-                handle_tfs_mount();
+                if (handle_tfs_mount() != 0) {
+                    fprintf(stderr, "Failed to mount client\n");
+                }
                 break;
             case TFS_OP_CODE_UNMOUNT:
                 wrap_packet_parser_fn(NULL, op_code);
@@ -297,7 +299,7 @@ int handle_tfs_mount() {
     int pipe_out = open(client_pipe_name, O_WRONLY);
     if (pipe_out < 0) {
         perror("Failed to open pipe");
-        return 0;
+        return -1;
     }
 
     if (session_id < 0) {
@@ -314,6 +316,7 @@ int handle_tfs_mount() {
         if (close(pipe_out) < 0) {
             perror("Failed to close pipe");
         }
+        return -1;
     }
     return 0;
 }
