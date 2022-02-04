@@ -256,7 +256,7 @@ void *session_worker(void *args) {
             result = handle_tfs_unmount(worker);
             break;
         case TFS_OP_CODE_OPEN:
-            result = handle_tfs_open_worker(worker);
+            result = handle_tfs_open(worker);
             break;
         case TFS_OP_CODE_CLOSE:
             result = handle_tfs_close(worker);
@@ -333,7 +333,7 @@ int handle_tfs_unmount(worker_t *worker) {
     return 0;
 }
 
-int handle_tfs_open_worker(worker_t *worker) {
+int handle_tfs_open(worker_t *worker) {
     packet_t *packet = &worker->packet;
 
     int result = tfs_open(packet->file_name, packet->flags);
