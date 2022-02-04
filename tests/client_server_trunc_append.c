@@ -22,7 +22,8 @@
 char *input_files[] = {"input1.txt", "input1.txt", "input2.txt", "input2.txt",
                        "input3.txt", "input3.txt", "input4.txt", "input4.txt"};
 int mode[] = {0, 1, 0, 1, 0, 1, 0, 1, 0, 1}; // 0 = append, 1 = truncate
-char *tfs_files[] = {"/f1", "/f2", "/f3", "/f4", "/f5", "/f6", "/f7", "/f8"};
+char *tfs_files[] = {"/ta_f1", "/ta_f2", "/ta_f3", "/ta_f4",
+                     "/ta_f5", "/ta_f6", "/ta_f7", "/ta_f8"};
 
 void truncate_or_append(char *server_pipe, int input);
 void write_from_external(char *server_pipe, int input);

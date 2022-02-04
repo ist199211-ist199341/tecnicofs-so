@@ -51,7 +51,7 @@ int main(int argc, char **argv) {
 
 void run_test(char *server_pipe, int client_id) {
     char *str = "AAA!";
-    char *path = "/f1";
+    char *path = "/simple_f1";
     char buffer[40];
 
     int f;
