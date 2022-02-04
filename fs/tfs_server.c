@@ -91,7 +91,7 @@ int main(int argc, char **argv) {
 
         bytes_read = read(pipe_in, &op_code, sizeof(char));
         if (bytes_read < 0 && errno == EINTR) {
-            bytes_read = 10;
+            bytes_read = READ_INTERRUPTED_SIGNAL;
         }
 
         // main listener loop
@@ -124,11 +124,10 @@ int main(int argc, char **argv) {
             }
             bytes_read = read(pipe_in, &op_code, sizeof(char));
             if (bytes_read < 0 && errno == EINTR) {
-                bytes_read = 10;
+                bytes_read = READ_INTERRUPTED_SIGNAL;
             }
         }
 
-        // https://stackoverflow.com/questions/41474299/checking-if-errno-eintr-what-does-it-mean
         if (bytes_read < 0 && errno != EINTR) {
             perror("Failed to read pipe");
             if (close(pipe_in) < 0) {
@@ -234,7 +233,13 @@ void wrap_packet_parser_fn(int parser_fn(worker_t *), char op_code) {
     int session_id;
     // TODO handle errors here manually, since we don't want to return -1 with
     // the macro
-    read(pipe_in, &session_id, sizeof(int));
+    ssize_t bytes_read = read(pipe_in, &session_id, sizeof(int));
+    while (bytes_read < 0) {
+        if (errno != EINTR) {
+            return;
+        }
+        bytes_read = read(pipe_in, &session_id, sizeof(int));
+    }
 
     worker_t *worker = &workers[session_id];
     mutex_lock(&worker->lock);

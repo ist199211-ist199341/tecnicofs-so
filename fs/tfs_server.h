@@ -6,6 +6,8 @@
 #include <pthread.h>
 #include <stdbool.h>
 
+#define READ_INTERRUPTED_SIGNAL 10
+
 /* Represents a packet */
 typedef struct {
     char opcode;
