@@ -5,8 +5,7 @@
 #include "config.h"
 #include <pthread.h>
 #include <stdbool.h>
-
-#define READ_INTERRUPTED_SIGNAL 10
+#include <sys/types.h>
 
 /* Represents a packet */
 typedef struct {
@@ -135,9 +134,18 @@ int handle_tfs_shutdown_after_all_closed(worker_t *worker);
 void close_server_by_user(int s);
 
 /*
- * Handles the SIGPIPE signal.
- * Closes the server.
+ * Close and unlink server pipe and then exit the program with the given status
  */
-void close_server_by_pipe_broken(int s);
+void close_server(int status);
+
+/*
+ * Same as POSIX's read, but handles EINTR correctly.
+ */
+ssize_t try_read(int fd, void *buf, size_t count);
+
+/*
+ * Same as POSIX's write, but handles EINTR correctly.
+ */
+ssize_t try_write(int fd, const void *buf, size_t count);
 
 #endif

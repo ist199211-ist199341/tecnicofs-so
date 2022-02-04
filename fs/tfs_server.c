@@ -12,13 +12,13 @@
 
 /* check if all the content was written to the pipe. */
 #define write_pipe(pipe, buffer, size)                                         \
-    if (write(pipe, buffer, size) != size) {                                   \
+    if (try_write(pipe, buffer, size) != size) {                               \
         return -1;                                                             \
     }
 
 /* check if all the content was read from the pipe. */
 #define read_pipe(pipe, buffer, size)                                          \
-    if (read(pipe, buffer, size) != size) {                                    \
+    if (try_read(pipe, buffer, size) != size) {                                \
         return -1;                                                             \
     }
 
@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
     }
 
     signal(SIGINT, close_server_by_user);
-    signal(SIGPIPE, close_server_by_pipe_broken);
+    signal(SIGPIPE, SIG_IGN);
 
     if (init_server() != 0) {
         printf("Failed to init server\n");
@@ -78,25 +78,22 @@ int main(int argc, char **argv) {
         int tmp_pipe = open(pipename, O_RDONLY);
         if (tmp_pipe < 0) {
             perror("Failed to open server pipe");
-            unlink(pipename);
-            exit(EXIT_FAILURE);
+            close_server(EXIT_FAILURE);
         }
         if (close(tmp_pipe) < 0) {
             perror("Failed to close pipe");
-            exit(EXIT_FAILURE);
+            close_server(EXIT_FAILURE);
         }
 
         ssize_t bytes_read;
         char op_code;
 
-        bytes_read = read(pipe_in, &op_code, sizeof(char));
-        if (bytes_read < 0 && errno == EINTR) {
-            bytes_read = READ_INTERRUPTED_SIGNAL;
-        }
+        bytes_read = try_read(pipe_in, &op_code, sizeof(char));
 
         // main listener loop
         while (bytes_read > 0) {
 
+            fflush(stdout);
             switch (op_code) {
             case TFS_OP_CODE_MOUNT:
                 handle_tfs_mount();
@@ -122,34 +119,16 @@ int main(int argc, char **argv) {
             default:
                 break;
             }
-            bytes_read = read(pipe_in, &op_code, sizeof(char));
-            if (bytes_read < 0 && errno == EINTR) {
-                bytes_read = READ_INTERRUPTED_SIGNAL;
-            }
+            bytes_read = try_read(pipe_in, &op_code, sizeof(char));
         }
 
-        if (bytes_read < 0 && errno != EINTR) {
+        if (bytes_read < 0) {
             perror("Failed to read pipe");
-            if (close(pipe_in) < 0) {
-                perror("Failed to close pipe");
-                exit(EXIT_FAILURE);
-            }
-            if (unlink(pipename) != 0) {
-                perror("Failed to delete pipe");
-            }
-            exit(EXIT_FAILURE);
+            close_server(EXIT_FAILURE);
         }
     }
-    if (close(pipe_in) < 0) {
-        perror("Failed to close pipe");
-        exit(EXIT_FAILURE);
-    }
 
-    if (unlink(pipename) != 0) {
-        perror("Failed to delete pipe");
-        exit(EXIT_FAILURE);
-    }
-
+    close_server(EXIT_SUCCESS);
     return 0;
 }
 
@@ -216,9 +195,8 @@ int parse_tfs_write_packet(worker_t *worker) {
     read_pipe(pipe_in, &worker->packet.fhandle, sizeof(int));
     read_pipe(pipe_in, &worker->packet.len, sizeof(size_t));
     char *buffer = (char *)malloc(worker->packet.len * sizeof(char));
-
     if (buffer == NULL) {
-        exit(EXIT_FAILURE);
+        return -1;
     }
 
     read_pipe(pipe_in, buffer, worker->packet.len * sizeof(char));
@@ -236,14 +214,14 @@ int parse_tfs_read_packet(worker_t *worker) {
 
 void wrap_packet_parser_fn(int parser_fn(worker_t *), char op_code) {
     int session_id;
-    // TODO handle errors here manually, since we don't want to return -1 with
-    // the macro
-    ssize_t bytes_read = read(pipe_in, &session_id, sizeof(int));
-    while (bytes_read < 0) {
-        if (errno != EINTR) {
-            return;
-        }
-        bytes_read = read(pipe_in, &session_id, sizeof(int));
+    if (try_read(pipe_in, &session_id, sizeof(int)) != sizeof(int)) {
+        perror("Could not read from server pipe");
+        close_server(EXIT_FAILURE);
+    }
+    if (session_id < 0 || session_id > SIMULTANEOUS_CONNECTIONS) {
+        fprintf(stderr, "session_id %d is invalid when parsing packet\n",
+                session_id);
+        close_server(EXIT_FAILURE);
     }
 
     worker_t *worker = &workers[session_id];
@@ -260,14 +238,14 @@ void wrap_packet_parser_fn(int parser_fn(worker_t *), char op_code) {
     if (result == 0) {
         if (pthread_cond_signal(&worker->cond) != 0) {
             perror("Couldn't signal worker");
-            exit(EXIT_FAILURE);
+            close_server(EXIT_FAILURE);
         }
     } else {
         /* if there is an error during the parsing of the message, discard
          * this session */
         if (free_worker(worker->session_id) == -1) {
             perror("Failed to free worker");
-            exit(EXIT_FAILURE);
+            close_server(EXIT_FAILURE);
         }
     }
 
@@ -314,7 +292,7 @@ void *session_worker(void *args) {
              * this session */
             if (free_worker(worker->session_id) == -1) {
                 perror("Failed to free worker");
-                exit(EXIT_FAILURE);
+                close_server(EXIT_FAILURE);
             }
         }
 
@@ -341,9 +319,9 @@ int handle_tfs_mount() {
     write_pipe(pipe_out, &session_id, sizeof(int));
 
     if (session_id < 0) {
+        // we cannot mount this client, close its pipe
         if (close(pipe_out) < 0) {
             perror("Failed to close pipe");
-            exit(EXIT_FAILURE);
         }
     }
     return 0;
@@ -356,13 +334,15 @@ int handle_tfs_unmount(worker_t *worker) {
 
     if (close(worker->pipe_out) < 0) {
         perror("Failed to close pipe");
-        exit(EXIT_FAILURE);
     }
 
     if (free_worker(worker->session_id) == -1) {
         perror("Failed to free worker");
-        exit(EXIT_FAILURE);
+        close_server(EXIT_FAILURE);
     }
+
+    printf("The session number %d was unmounted with success.\n",
+           worker->session_id);
     return 0;
 }
 
@@ -397,9 +377,8 @@ int handle_tfs_write(worker_t *worker) {
 int handle_tfs_read(worker_t *worker) {
     packet_t *packet = &worker->packet;
     char *buffer = (char *)malloc(sizeof(char) * packet->len);
-
     if (buffer == NULL) {
-        exit(EXIT_FAILURE);
+        return -1;
     }
 
     int result = (int)tfs_read(packet->fhandle, buffer, packet->len);
@@ -418,14 +397,17 @@ int handle_tfs_shutdown_after_all_closed(worker_t *worker) {
     int result = tfs_destroy_after_all_closed();
     write_pipe(worker->pipe_out, &result, sizeof(int));
 
-    exit_server = true;
+    close_server(EXIT_SUCCESS);
 
     return 0;
 }
 
 void close_server_by_user(int singnum) {
     (void)singnum;
+    close_server(EXIT_SUCCESS);
+}
 
+void close_server(int status) {
     if (close(pipe_in) < 0) {
         perror("Failed to close pipe");
         exit(EXIT_FAILURE);
@@ -436,19 +418,22 @@ void close_server_by_user(int singnum) {
         exit(EXIT_FAILURE);
     }
 
-    printf("\nSucessfully ended the server.\n");
-    exit(0);
+    printf("\nSuccessfully ended the server.\n");
+    exit(status);
 }
 
-void close_server_by_pipe_broken(int singnum) {
-    (void)singnum;
+ssize_t try_read(int fd, void *buf, size_t count) {
+    ssize_t bytes_read;
+    do {
+        bytes_read = read(fd, buf, count);
+    } while (bytes_read < 0 && errno == EINTR);
+    return bytes_read;
+}
 
-    printf("\nA pipe was broken.\n Shutting down the server.\n");
-
-    if (unlink(pipename) != 0) {
-        perror("Failed to delete pipe");
-        exit(EXIT_FAILURE);
-    }
-
-    exit(0);
+ssize_t try_write(int fd, const void *buf, size_t count) {
+    ssize_t bytes_written;
+    do {
+        bytes_written = write(fd, buf, count);
+    } while (bytes_written < 0 && errno == EINTR);
+    return bytes_written;
 }
