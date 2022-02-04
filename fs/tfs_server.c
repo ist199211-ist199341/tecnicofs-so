@@ -25,7 +25,6 @@
 static worker_t workers[SIMULTANEOUS_CONNECTIONS];
 static bool free_workers[SIMULTANEOUS_CONNECTIONS];
 static pthread_mutex_t free_worker_lock;
-static bool exit_server = false;
 
 static int pipe_in;
 
@@ -70,7 +69,7 @@ int main(int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
 
-    while (!exit_server) {
+    while (true) {
         /* Open and close a dummy pipe to avoid having active wait for another
          * process to open the pipe. The 'open' function blocks until the pipe
          * is openned on the other side, therefore doing exactly what we want.
@@ -93,7 +92,6 @@ int main(int argc, char **argv) {
         // main listener loop
         while (bytes_read > 0) {
 
-            fflush(stdout);
             switch (op_code) {
             case TFS_OP_CODE_MOUNT:
                 handle_tfs_mount();
